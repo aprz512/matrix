@@ -26,16 +26,21 @@ public class TraceDataUtils {
         void fallback(List<MethodItem> stack, int size);
     }
 
+    /**
+     * METHOD_ID_DISPATCH 这个是入口函数，它会层层调用其他函数
+     */
     public static void structuredDataToStack(long[] buffer, LinkedList<MethodItem> result, boolean isStrict, long endTime) {
         long lastInId = 0L;
         int depth = 0;
         LinkedList<Long> rawData = new LinkedList<>();
         boolean isBegin = !isStrict;
 
+        // 遍历 buffer
         for (long trueId : buffer) {
             if (0 == trueId) {
                 continue;
             }
+            // 严格模式，需要找入口函数才能继续进行
             if (isStrict) {
                 if (isIn(trueId) && AppMethodBeat.METHOD_ID_DISPATCH == getMethodId(trueId)) {
                     isBegin = true;
@@ -47,21 +52,29 @@ public class TraceDataUtils {
                 }
 
             }
+            // i 方法，则入栈
             if (isIn(trueId)) {
                 lastInId = getMethodId(trueId);
+                // 入口函数，深度为 0
                 if (lastInId == AppMethodBeat.METHOD_ID_DISPATCH) {
                     depth = 0;
                 }
+                // 不是入口函数，深入累加
                 depth++;
                 rawData.push(trueId);
-            } else {
+            }
+            // o 方法，则出栈
+            else {
+                //
                 int outMethodId = getMethodId(trueId);
                 if (!rawData.isEmpty()) {
+                    // 因为直接就出栈了，所以 o 前面肯定是与之对应的 i
                     long in = rawData.pop();
                     depth--;
                     int inMethodId;
                     LinkedList<Long> tmp = new LinkedList<>();
                     tmp.add(in);
+                    //正常情况下是不会走到这个循环内部的
                     while ((inMethodId = getMethodId(in)) != outMethodId && !rawData.isEmpty()) {
                         MatrixLog.w(TAG, "pop inMethodId[%s] to continue match ouMethodId[%s]", inMethodId, outMethodId);
                         in = rawData.pop();
@@ -69,6 +82,7 @@ public class TraceDataUtils {
                         tmp.add(in);
                     }
 
+                    // 出现了异常，o 找不到匹配的 i
                     if (inMethodId != outMethodId && inMethodId == AppMethodBeat.METHOD_ID_DISPATCH) {
                         MatrixLog.e(TAG, "inMethodId[%s] != outMethodId[%s] throw this outMethodId!", inMethodId, outMethodId);
                         rawData.addAll(tmp);
@@ -78,6 +92,7 @@ public class TraceDataUtils {
 
                     long outTime = getTime(trueId);
                     long inTime = getTime(in);
+                    // 计算时间
                     long during = outTime - inTime;
                     if (during < 0) {
                         MatrixLog.e(TAG, "[structuredDataToStack] trace during invalid:%d", during);
@@ -85,6 +100,7 @@ public class TraceDataUtils {
                         result.clear();
                         return;
                     }
+                    // 构建一个 item 对象，里面有 id，耗时，深度
                     MethodItem methodItem = new MethodItem(outMethodId, (int) during, depth);
                     addMethodItem(result, methodItem);
                 } else {
@@ -93,6 +109,7 @@ public class TraceDataUtils {
             }
         }
 
+        // ANR 情况下，可能有部分 o 方法没有来得及执行，直接使用 endTime 作为结束时间
         while (!rawData.isEmpty() && isStrict) {
             long trueId = rawData.pop();
             int methodId = getMethodId(trueId);
@@ -107,6 +124,8 @@ public class TraceDataUtils {
             MethodItem methodItem = new MethodItem(methodId, (int) (endTime - inTime), rawData.size());
             addMethodItem(result, methodItem);
         }
+
+        // 这段操作没看懂啊，为啥要先转树，然后又转回来
         TreeNode root = new TreeNode(null, null);
         stackToTree(result, root);
         result.clear();
@@ -125,6 +144,10 @@ public class TraceDataUtils {
         return (int) ((trueId >> 43) & 0xFFFFFL);
     }
 
+    /**
+     * 一个方法被调用了多次，将方法信息合并
+     * 需要该方法在同一层级
+     */
     private static int addMethodItem(LinkedList<MethodItem> resultStack, MethodItem item) {
         if (AppMethodBeat.isDev) {
             Log.v(TAG, "method:" + item);
@@ -156,6 +179,7 @@ public class TraceDataUtils {
         }
     }
 
+    // 又将树转链表了
     private static void treeToStack(TreeNode root, LinkedList<MethodItem> list) {
 
         for (int i = 0; i < root.children.size(); i++) {
@@ -171,8 +195,7 @@ public class TraceDataUtils {
     /**
      * Structured the method stack as a tree Data structure
      *
-     * @param resultStack
-     * @return
+     * 将链表转树
      */
     public static int stackToTree(LinkedList<MethodItem> resultStack, TreeNode root) {
         TreeNode lastNode = null;
@@ -188,10 +211,15 @@ public class TraceDataUtils {
             int depth = node.depth();
             if (lastNode == null || depth == 0) {
                 root.add(node);
-            } else if (lastNode.depth() >= depth) {
+            }
+            // 两个节点的深度相等的话
+            else if (lastNode.depth() >= depth) {
+                // 向上遍历找到 father
                 while (null != lastNode && lastNode.depth() > depth) {
                     lastNode = lastNode.father;
                 }
+                // 将节点关系理顺
+                // 该节点的 father 与同一深度最前面的节点的 father 是一样的
                 if (lastNode != null && lastNode.father != null) {
                     node.father = lastNode.father;
                     lastNode.father.add(node);
@@ -280,7 +308,7 @@ public class TraceDataUtils {
         }
     }
 
-
+    // 将 stack 裁剪到 targetCount 大小
     public static void trimStack(List<MethodItem> stack, int targetCount, IStructuredDataFilter filter) {
         if (0 > targetCount) {
             stack.clear();
@@ -290,9 +318,11 @@ public class TraceDataUtils {
         int filterCount = 1;
         int curStackSize = stack.size();
         while (curStackSize > targetCount) {
+            // 从后往前遍历
             ListIterator<MethodItem> iterator = stack.listIterator(stack.size());
             while (iterator.hasPrevious()) {
                 MethodItem item = iterator.previous();
+                // 将满足过滤条件的删掉
                 if (filter.isFilter(item.durTime, filterCount)) {
                     iterator.remove();
                     curStackSize--;
@@ -303,12 +333,14 @@ public class TraceDataUtils {
             }
             curStackSize = stack.size();
             filterCount++;
+            // 外部会用到这个次数，可以根据遍历次数来做动态的调整，更改过滤条件，使之更宽
             if (filter.getFilterMaxCount() < filterCount) {
                 break;
             }
         }
         int size = stack.size();
         if (size > targetCount) {
+            // 过滤完成后还是大于指定的数字，则交给调用者自己处理
             filter.fallback(stack, size);
         }
     }

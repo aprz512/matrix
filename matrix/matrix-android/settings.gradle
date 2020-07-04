@@ -1,3 +1,4 @@
+include ':sample'
 include ':matrix-gradle-plugin'
 include ':matrix-android-commons'
 include ':matrix-android-lib'

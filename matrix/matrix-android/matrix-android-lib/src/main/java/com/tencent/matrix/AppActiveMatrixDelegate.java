@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.Set;
 
 
+/**
+ * 主要是监测 APP 前后台
+ */
 public enum AppActiveMatrixDelegate {
 
     INSTANCE;
@@ -41,6 +44,8 @@ public enum AppActiveMatrixDelegate {
         }
         this.isInit = true;
         this.handler = new Handler(MatrixHandlerThread.getDefaultHandlerThread().getLooper());
+        // 注册了两个接口
+        // ComponentCallbacks 会回调 onTrimMemory，由于回调该方法的时候是在后台，所以做了一个容错处理
         application.registerComponentCallbacks(controller);
         application.registerActivityLifecycleCallbacks(controller);
     }
@@ -178,6 +183,7 @@ public enum AppActiveMatrixDelegate {
         @Override
         public void onTrimMemory(int level) {
             MatrixLog.i(TAG, "[onTrimMemory] level:%s", level);
+            // 这里是避免判断不正确，所以做了容错处理
             if (level == TRIM_MEMORY_UI_HIDDEN && isAppForeground) { // fallback
                 onDispatchBackground(visibleScene);
             }

@@ -1,6 +1,7 @@
 package com.tencent.matrix.trace.tracer;
 
 import android.os.Process;
+import android.util.Log;
 
 import com.tencent.matrix.Matrix;
 import com.tencent.matrix.report.Issue;

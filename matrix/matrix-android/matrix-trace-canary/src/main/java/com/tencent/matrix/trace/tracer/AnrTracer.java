@@ -4,6 +4,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.tencent.matrix.Matrix;
 import com.tencent.matrix.report.Issue;
@@ -134,7 +135,9 @@ public class AnrTracer extends Tracer {
             // trace
             LinkedList<MethodItem> stack = new LinkedList();
             if (data.length > 0) {
+                // 将 buffer 中的 long 转为 MethodItem
                 TraceDataUtils.structuredDataToStack(data, stack, true, curTime);
+                //
                 TraceDataUtils.trimStack(stack, Constants.TARGET_EVIL_METHOD_STACK, new TraceDataUtils.IStructuredDataFilter() {
                     @Override
                     public boolean isFilter(long during, int filterCount) {

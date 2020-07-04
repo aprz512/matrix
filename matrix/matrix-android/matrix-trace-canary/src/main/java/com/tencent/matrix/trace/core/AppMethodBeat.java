@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.tencent.matrix.AppActiveMatrixDelegate;
 import com.tencent.matrix.trace.constants.Constants;
@@ -33,6 +34,11 @@ public class AppMethodBeat implements BeatLifecycle {
     private static final int STATUS_EXPIRED_START = -2;
     private static final int STATUS_OUT_RELEASE = -3;
 
+    // 一开始是默认状态
+    // 但是这里有一个静态代码块 ，会将状态改为 STATUS_OUT_RELEASE
+    // 调用 onStart() 后是 STATUS_STARTED
+    // 第一次 执行 i 方法后是 STATUS_READY
+    // 调用 onStop() 后是 STATUS_STOPPED
     private static volatile int status = STATUS_DEFAULT;
     private final static Object statusLock = new Object();
     public static MethodEnterListener sMethodEnterListener;
@@ -40,7 +46,9 @@ public class AppMethodBeat implements BeatLifecycle {
     private static int sIndex = 0;
     private static int sLastIndex = -1;
     private static boolean assertIn = false;
+    // 这个时间会在另外一个线程不断的去更新
     private volatile static long sCurrentDiffTime = SystemClock.uptimeMillis();
+    // sDiffTime 是一个基准时间，在这个类加载的时候得到的值
     private volatile static long sDiffTime = sCurrentDiffTime;
     private static long sMainThreadId = Looper.getMainLooper().getThread().getId();
     private static HandlerThread sTimerUpdateThread = MatrixHandlerThread.getNewHandlerThread("matrix_time_update_thread");
@@ -72,9 +80,12 @@ public class AppMethodBeat implements BeatLifecycle {
     };
 
     static {
+        // 这里是延迟了 15s，为啥我调试的时候很快就运行了
+        // 还是打日志管用
         sHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
+                // 15s 后还没有调用 i 的话，就不干了
                 realRelease();
             }
         }, Constants.DEFAULT_RELEASE_BUFFER_DELAY);
@@ -82,6 +93,12 @@ public class AppMethodBeat implements BeatLifecycle {
 
     /**
      * update time runnable
+     * 考虑到每个方法执行前后都获取系统时间（System.nanoTime）会对性能影响比较大，
+     * 而实际上，单个函数执行耗时小于 5ms 的情况，对卡顿来说不是主要原因，可以忽略不计，
+     * 如果是多次调用的情况，则在它的父级方法中可以反映出来，所以为了减少对性能的影响，
+     * 通过另一条更新时间的线程每 5ms 去更新一个时间变量，而每个方法执行前后只读取该变量来减少性能损耗。
+     *
+     * 终于知道为啥写的这么蛋疼了，为了更好的运行性能，只能不断的优化代码，使用各种变量控制位
      */
     private static Runnable sUpdateDiffTimeRunnable = new Runnable() {
         @Override
@@ -92,6 +109,7 @@ public class AppMethodBeat implements BeatLifecycle {
                         sCurrentDiffTime = SystemClock.uptimeMillis() - sDiffTime;
                         SystemClock.sleep(Constants.TIME_UPDATE_CYCLE_MS);
                     }
+                    // 这个锁是为了不让空循环，浪费CPU
                     synchronized (updateTimeLock) {
                         updateTimeLock.wait();
                     }
@@ -108,6 +126,7 @@ public class AppMethodBeat implements BeatLifecycle {
 
     @Override
     public void onStart() {
+        Log.e("123", "onStart=" + status);
         synchronized (statusLock) {
             if (status < STATUS_STARTED && status >= STATUS_EXPIRED_START) {
                 sHandler.removeCallbacks(checkStartExpiredRunnable);
@@ -162,6 +181,7 @@ public class AppMethodBeat implements BeatLifecycle {
 
         sCurrentDiffTime = SystemClock.uptimeMillis() - sDiffTime;
 
+        // 移除了静态代码块里面post的消息
         sHandler.removeCallbacksAndMessages(null);
         sHandler.postDelayed(sUpdateDiffTimeRunnable, Constants.TIME_UPDATE_CYCLE_MS);
         sHandler.postDelayed(checkStartExpiredRunnable = new Runnable() {
@@ -297,6 +317,7 @@ public class AppMethodBeat implements BeatLifecycle {
      * @param isIn
      */
     private static void mergeData(int methodId, int index, boolean isIn) {
+        // 看注释这里是修复了一个bug，anr时间计算有问题
         if (methodId == AppMethodBeat.METHOD_ID_DISPATCH) {
             sCurrentDiffTime = SystemClock.uptimeMillis() - sDiffTime;
         }
@@ -306,6 +327,10 @@ public class AppMethodBeat implements BeatLifecycle {
         }
         trueId |= (long) methodId << 43;
         trueId |= sCurrentDiffTime & 0x7FFFFFFFFFFL;
+        // sBuffer 是一个long数组，long的结构：
+        // 第1位是 1或者0，1是函数入口，0是函数出口
+        // 2-21位是 methodId
+        // 22-64位是 函数的执行前后距离 MethodBeat 模块初始化的时间，一个函数会有占两个问题，根据 methodId 就可以计算出函数耗时
         sBuffer[index] = trueId;
         checkPileup(index);
         sLastIndex = index;
@@ -336,6 +361,7 @@ public class AppMethodBeat implements BeatLifecycle {
             IndexRecord record = sIndexRecordHead;
             IndexRecord last = null;
             while (record != null) {
+                // 不考虑这个 if 条件，是向链表最后添加一个元素
                 if (indexRecord.index <= record.index) {
                     if (null == last) {
                         IndexRecord tmp = sIndexRecordHead;
@@ -387,6 +413,7 @@ public class AppMethodBeat implements BeatLifecycle {
         public boolean isValid = true;
         public String source;
 
+        // 将当前 IndexRecord 从链表中删除
         public void release() {
             isValid = false;
             IndexRecord record = sIndexRecordHead;
@@ -396,6 +423,7 @@ public class AppMethodBeat implements BeatLifecycle {
                     if (null != last) {
                         last.next = record.next;
                     } else {
+                        // 头节点为this
                         sIndexRecordHead = record.next;
                     }
                     record.next = null;

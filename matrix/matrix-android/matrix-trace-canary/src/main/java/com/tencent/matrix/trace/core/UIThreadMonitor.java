@@ -85,6 +85,7 @@ public class UIThreadMonitor implements BeatLifecycle, Runnable {
         this.config = config;
         choreographer = Choreographer.getInstance();
         callbackQueueLock = reflectObject(choreographer, "mLock");
+        MatrixLog.d(TAG, "init...." + callbackQueueLock);
         callbackQueues = reflectObject(choreographer, "mCallbackQueues");
 
         addInputQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_INPUT], ADD_CALLBACK, long.class, Object.class, Object.class);
@@ -311,6 +312,7 @@ public class UIThreadMonitor implements BeatLifecycle, Runnable {
 
     @Override
     public void run() {
+        MatrixLog.d(TAG, "run....");
         final long start = System.nanoTime();
         try {
             doFrameBegin(token);

@@ -22,7 +22,7 @@ package com.tencent.matrix.trace.constants;
 
 public class Constants {
 
-    public static final int BUFFER_SIZE = 100 * 10000; // 7.6M
+    public static final int BUFFER_SIZE = 90; // 7.6M
     public static final int TIME_UPDATE_CYCLE_MS = 5;
     public static final int FILTER_STACK_MAX_COUNT = 60;
     public static final float FILTER_STACK_KEY_ALL_PERCENT = .3F;
