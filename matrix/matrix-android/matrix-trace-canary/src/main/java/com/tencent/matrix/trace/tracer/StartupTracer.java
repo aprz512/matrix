@@ -117,8 +117,9 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
         // 温启动
         else if (isWarmStartUp()) {
             isWarmStartUp = false;
-            // 计算的是当前 activity 从启动到 onActivityFocused 的时间
+            // 计算的是第一个 activity 从启动到 onActivityFocused 的时间
             // ActivityThreadHacker hook 了 H 的 LAUNCH_ACTIVITY
+            // 温启动，application 还在
             long warmCost = uptimeMillis() - ActivityThreadHacker.getLastLaunchActivityTime();
             if (warmCost > 0) {
                 analyse(ActivityThreadHacker.getApplicationCost(), firstScreenCost, warmCost, true);
