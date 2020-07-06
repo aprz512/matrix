@@ -43,7 +43,10 @@ public class ActivityThreadHacker {
 
     public static void hackSysHandlerCallback() {
         try {
+            // i 方法到处都有插入，所以可以认为它会最先执行，然后调用到这里
+            // application 创建时间
             sApplicationCreateBeginTime = SystemClock.uptimeMillis();
+            // 记录一下 index
             sApplicationCreateBeginMethodIndex = AppMethodBeat.getInstance().maskIndex("ApplicationCreateBeginMethodIndex");
             Class<?> forName = Class.forName("android.app.ActivityThread");
             Field field = forName.getDeclaredField("sCurrentActivityThread");
@@ -105,11 +108,13 @@ public class ActivityThreadHacker {
             }
             if (isLaunchActivity) {
                 ActivityThreadHacker.sLastLaunchActivityTime = SystemClock.uptimeMillis();
+                // 启动 activity，记录 index
                 ActivityThreadHacker.sLastLaunchActivityMethodIndex = AppMethodBeat.getInstance().maskIndex("LastLaunchActivityMethodIndex");
             }
 
             if (!isCreated) {
                 if (isLaunchActivity || msg.what == CREATE_SERVICE || msg.what == RECEIVER) { // todo for provider
+                    // 第一次启动 activity / service / receiver，application 创建结束
                     ActivityThreadHacker.sApplicationCreateEndTime = SystemClock.uptimeMillis();
                     ActivityThreadHacker.sApplicationCreateScene = msg.what;
                     isCreated = true;

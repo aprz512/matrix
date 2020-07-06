@@ -88,11 +88,15 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
 
     @Override
     public void onActivityFocused(String activity) {
+        // 冷启动
         if (isColdStartup()) {
             if (firstScreenCost == 0) {
+                // 从 application 创建到第一个activity 回调 onActivityFocused 的时间
+                // ActivityThreadHacker.getEggBrokenTime() 是 application 创建的时间，不知道为啥要起这么个蛋疼的名字
                 this.firstScreenCost = uptimeMillis() - ActivityThreadHacker.getEggBrokenTime();
             }
             if (hasShowSplashActivity) {
+                // coldCost 还算上了 splash 显示的时间，从 application 创建到 "mainActivity"
                 coldCost = uptimeMillis() - ActivityThreadHacker.getEggBrokenTime();
             } else {
                 if (splashActivities.contains(activity)) {
@@ -105,11 +109,16 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
                 }
             }
             if (coldCost > 0) {
+                // 分析
                 analyse(ActivityThreadHacker.getApplicationCost(), firstScreenCost, coldCost, false);
             }
 
-        } else if (isWarmStartUp()) {
+        }
+        // 温启动
+        else if (isWarmStartUp()) {
             isWarmStartUp = false;
+            // 计算的是当前 activity 从启动到 onActivityFocused 的时间
+            // ActivityThreadHacker hook 了 H 的 LAUNCH_ACTIVITY
             long warmCost = uptimeMillis() - ActivityThreadHacker.getLastLaunchActivityTime();
             if (warmCost > 0) {
                 analyse(ActivityThreadHacker.getApplicationCost(), firstScreenCost, warmCost, true);
@@ -129,11 +138,16 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
     private void analyse(long applicationCost, long firstScreenCost, long allCost, boolean isWarmStartUp) {
         MatrixLog.i(TAG, "[report] applicationCost:%s firstScreenCost:%s allCost:%s isWarmStartUp:%s", applicationCost, firstScreenCost, allCost, isWarmStartUp);
         long[] data = new long[0];
+        // 冷启动不得超过 10s
         if (!isWarmStartUp && allCost >= coldStartupThresholdMs) { // for cold startup
+            // 分析 ApplicationCreateBeginMethodIndex 的方法栈
             data = AppMethodBeat.getInstance().copyData(ActivityThreadHacker.sApplicationCreateBeginMethodIndex);
             ActivityThreadHacker.sApplicationCreateBeginMethodIndex.release();
 
-        } else if (isWarmStartUp && allCost >= warmStartupThresholdMs) {
+        }
+        // 温启动不得超过 4s
+        else if (isWarmStartUp && allCost >= warmStartupThresholdMs) {
+            // 分析 LastLaunchActivityMethodIndex 的方法栈
             data = AppMethodBeat.getInstance().copyData(ActivityThreadHacker.sLastLaunchActivityMethodIndex);
             ActivityThreadHacker.sLastLaunchActivityMethodIndex.release();
         }
@@ -153,10 +167,15 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
 
         AnalyseTask(long[] data, long applicationCost, long firstScreenCost, long allCost, boolean isWarmStartUp, int scene) {
             this.data = data;
+            // 当前 activity
             this.scene = scene;
+            // application 耗时
             this.applicationCost = applicationCost;
+            // 启动直到用户看到第一个 activity 耗时
             this.firstScreenCost = firstScreenCost;
+            // 冷启动/温启动耗时
             this.allCost = allCost;
+            // 是冷启动还是温启动
             this.isWarmStartUp = isWarmStartUp;
         }
 
@@ -191,7 +210,9 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
 
             StringBuilder reportBuilder = new StringBuilder();
             StringBuilder logcatBuilder = new StringBuilder();
+            // 修正一下耗时
             long stackCost = Math.max(allCost, TraceDataUtils.stackToString(stack, reportBuilder, logcatBuilder));
+            // 这里只是用 stack 做了一个key
             String stackKey = TraceDataUtils.getTreeKey(stack, stackCost);
 
             // for logcat

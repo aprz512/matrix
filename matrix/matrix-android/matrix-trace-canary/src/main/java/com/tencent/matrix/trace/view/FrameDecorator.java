@@ -170,17 +170,21 @@ public class FrameDecorator extends IDoFrameListener implements IAppForeground {
         long duration = sumFrameCost - lastCost[0];
 
         long collectFrame = sumFrames - lastFrames[0];
+        // 至少要累积到200ms才做一次更新
         if (duration >= 200) {
+            // 拿到帧率
             final float fps = Math.min(60.f, 1000.f * collectFrame / duration);
             updateView(view.fpsView, fps);
             view.chartView.addFps((int) fps);
             lastCost[0] = sumFrameCost;
             lastFrames[0] = sumFrames;
+            // 没有消息处理了，就显示 60FPS
             mainHandler.removeCallbacks(updateDefaultRunnable);
             mainHandler.postDelayed(updateDefaultRunnable, 130);
         }
     }
 
+    // 根据不同的帧率画不同颜色的线
     private void updateView(final TextView view, final float fps) {
         mainHandler.post(new Runnable() {
             @Override

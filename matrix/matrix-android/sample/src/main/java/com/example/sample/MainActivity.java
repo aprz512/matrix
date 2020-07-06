@@ -73,22 +73,45 @@ public class MainActivity extends AppCompatActivity {
         test.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                final long s = System.currentTimeMillis();
-                while (true) {
-                    if (System.currentTimeMillis() > s + 6000) {
-                        break;
-                    }
-                }
-
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        Log.e("test", "000000000");
-                    }
-                }, 3000);
+                f();
             }
         });
 
 
     }
+
+    void f() {
+        E();
+        A();
+        A();
+        A();
+        A();
+//        B();
+//        C();
+        D();
+    }
+
+
+
+    void A() {
+        SystemClock.sleep(100);
+    }
+
+    void B () {
+        SystemClock.sleep(200);
+    }
+
+    void C() {
+        SystemClock.sleep(300);
+    }
+
+    private void D() {
+        SystemClock.sleep(1);
+    }
+
+    private void E() {
+        SystemClock.sleep(5);
+    }
+
+
 }
