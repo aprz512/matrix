@@ -59,6 +59,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.android.builder.model.AndroidProject.FD_OUTPUTS;
 
+/**
+ * 第一个Transform接收来自javac编译的结果，以及已经拉取到在本地的第三方依赖（jar. aar），还有resource资源，
+ * 注意，这里的resource并非android项目中的res资源，而是asset目录下的资源。
+ */
+
 public class MatrixTraceTransform extends Transform {
 
     private static final String TAG = "MatrixTraceTransform";
@@ -70,6 +75,8 @@ public class MatrixTraceTransform extends Transform {
 
         GlobalScope globalScope = variantScope.getGlobalScope();
         BaseVariantData variant = variantScope.getVariantData();
+        // 目录为 build/output/mapping/variant
+        // 目录为 build/output/traceClassOut/variant
         String mappingOut = Joiner.on(File.separatorChar).join(
                 String.valueOf(globalScope.getBuildDir()),
                 FD_OUTPUTS,
@@ -95,11 +102,13 @@ public class MatrixTraceTransform extends Transform {
             String[] hardTask = getTransformTaskName(extension.getCustomDexTransformName(), variant.getName());
             for (Task task : project.getTasks()) {
                 for (String str : hardTask) {
+                    // 找到指定的任务名
                     if (task.getName().equalsIgnoreCase(str) && task instanceof TransformTask) {
                         TransformTask transformTask = (TransformTask) task;
                         Log.i(TAG, "successfully inject task:" + transformTask.getName());
                         Field field = TransformTask.class.getDeclaredField("transform");
                         field.setAccessible(true);
+                        // 替换为自己的 MatrixTraceTransform，对该task进行增强
                         field.set(task, new MatrixTraceTransform(config, transformTask.getTransform()));
                         break;
                     }
@@ -112,6 +121,9 @@ public class MatrixTraceTransform extends Transform {
     }
 
 
+    // 指定想hook的任务名字
+    // 具体是哪一个 应该和 gradle的版本有关
+    // 最新的 R8 就没有这两个，所以暂时不支持
     private static String[] getTransformTaskName(String customDexTransformName, String buildTypeSuffix) {
         if (!Util.isNullOrNil(customDexTransformName)) {
             return new String[]{customDexTransformName + "For" + buildTypeSuffix};
@@ -129,21 +141,44 @@ public class MatrixTraceTransform extends Transform {
         this.origTransform = origTransform;
     }
 
+    /**
+     * 任务的名字全称：
+     * transform + "inputTypes + With + "Name" + For + "variant"
+     *
+     * @return
+     */
     @Override
     public String getName() {
         return TAG;
     }
 
+    /**
+     * Transform需要处理的类型
+     * 还有其他类型：自己戳进去看一下
+     */
     @Override
     public Set<QualifiedContent.ContentType> getInputTypes() {
         return TransformManager.CONTENT_CLASS;
     }
 
+    /**
+     * 作用域
+     * 要处理所有class字节码，Scope我们一般使用TransformManager.SCOPE_FULL_PROJECT
+     * https://stackoverflow.com/questions/38512487/definitions-for-gradle-transform-api-scopes
+     */
     @Override
     public Set<QualifiedContent.Scope> getScopes() {
         return TransformManager.SCOPE_FULL_PROJECT;
     }
 
+    /**
+     * 增量编译开关。
+     * 当我们开启增量编译的时候，相当input包含了changed/removed/added三种状态，实际上还有notchanged。需要做的操作如下：
+     * <p>
+     * NOTCHANGED: 当前文件不需处理，甚至复制操作都不用；
+     * ADDED、CHANGED: 正常处理，输出给下一个任务；
+     * REMOVED: 移除outputProvider获取路径对应的文件。
+     */
     @Override
     public boolean isIncremental() {
         return true;
@@ -152,20 +187,26 @@ public class MatrixTraceTransform extends Transform {
     @Override
     public void transform(TransformInvocation transformInvocation) throws TransformException, InterruptedException, IOException {
         super.transform(transformInvocation);
+
+        // 对 class 文件做处理
         long start = System.currentTimeMillis();
         try {
             doTransform(transformInvocation); // hack
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
+        // 计算耗时
         long cost = System.currentTimeMillis() - start;
         long begin = System.currentTimeMillis();
+        // 进行原来的处理逻辑
         origTransform.transform(transformInvocation);
+        // 计算耗时
         long origTransformCost = System.currentTimeMillis() - begin;
         Log.i("Matrix." + getName(), "[transform] cost time: %dms %s:%sms MatrixTraceTransform:%sms", System.currentTimeMillis() - start, origTransform.getClass().getSimpleName(), origTransformCost, cost);
     }
 
     private void doTransform(TransformInvocation transformInvocation) throws ExecutionException, InterruptedException {
+        // 是否增量编译
         final boolean isIncremental = transformInvocation.isIncremental() && this.isIncremental();
 
         /**
@@ -176,6 +217,7 @@ public class MatrixTraceTransform extends Transform {
         List<Future> futures = new LinkedList<>();
 
         final MappingCollector mappingCollector = new MappingCollector();
+        // methodId，自增
         final AtomicInteger methodId = new AtomicInteger(0);
         final ConcurrentHashMap<String, TraceMethod> collectedMethodMap = new ConcurrentHashMap<>();
 
@@ -185,6 +227,10 @@ public class MatrixTraceTransform extends Transform {
         Map<File, File> jarInputOutMap = new ConcurrentHashMap<>();
         Collection<TransformInput> inputs = transformInvocation.getInputs();
 
+
+        // 处理输入
+        // 主要是将输入类的字段替换掉，替换到指定的输出位置
+        // 里面做了增量的处理
         for (TransformInput input : inputs) {
 
             for (DirectoryInput directoryInput : input.getDirectoryInputs()) {
@@ -196,6 +242,7 @@ public class MatrixTraceTransform extends Transform {
             }
         }
 
+        // 等待list中的任务执行完成
         for (Future future : futures) {
             future.get();
         }
@@ -319,7 +366,9 @@ public class MatrixTraceTransform extends Transform {
 
     private class CollectDirectoryInputTask implements Runnable {
 
+        // 存放原始 源文件 和 输出 源文件的 对应关系
         Map<File, File> dirInputOutMap;
+        // 输入，Transform 是对输入做变化，然后输出
         DirectoryInput directoryInput;
         boolean isIncremental;
         String traceClassOut;
@@ -342,15 +391,22 @@ public class MatrixTraceTransform extends Transform {
         }
 
         private void handle() throws IOException, IllegalAccessException, NoSuchFieldException, ClassNotFoundException {
+            // 原始输入
             final File dirInput = directoryInput.getFile();
+            // 将处理的文件先输出到 traceClassOut 目录
+            // 文件名一样
             final File dirOutput = new File(traceClassOut, dirInput.getName());
+            // matrix\matrix\matrix-android\sample\build\intermediates\javac\debug\compileDebugJavaWithJavac\classes
             final String inputFullPath = dirInput.getAbsolutePath();
+            // matrix\matrix\matrix-android\traceClassOut\classes
             final String outputFullPath = dirOutput.getAbsolutePath();
 
+            // class 会有多级目录，需要先创建文件夹
             if (!dirOutput.exists()) {
                 dirOutput.mkdirs();
             }
 
+            // input 不存在，需要删除对应的 output
             if (!dirInput.exists() && dirOutput.exists()) {
                 if (dirOutput.isDirectory()) {
                     FileUtils.deleteFolder(dirOutput);
@@ -368,20 +424,28 @@ public class MatrixTraceTransform extends Transform {
                     final File changedFileInput = entry.getKey();
 
                     final String changedFileInputFullPath = changedFileInput.getAbsolutePath();
+                    // 替换目录的路径，内部文件的相对位置不变
                     final File changedFileOutput = new File(changedFileInputFullPath.replace(inputFullPath, outputFullPath));
 
+                    // 处理文件变化
                     if (status == Status.ADDED || status == Status.CHANGED) {
                         dirInputOutMap.put(changedFileInput, changedFileOutput);
                     } else if (status == Status.REMOVED) {
                         changedFileOutput.delete();
                     }
+
                     outChangedFiles.put(changedFileOutput, status);
                 }
+
+                // 使用反射 替换directoryInput的  改动文件目录
                 replaceChangedFile(directoryInput, outChangedFiles);
 
             } else {
+                // 全量编译模式下，所有的Class文件都需要扫描
                 dirInputOutMap.put(dirInput, dirOutput);
             }
+
+            // 反射input，将dirOutput设置为其输出目录
             replaceFile(directoryInput, dirOutput);
         }
     }
@@ -409,6 +473,8 @@ public class MatrixTraceTransform extends Transform {
             }
         }
 
+        // 这里的逻辑，同上，一个是 class，一个是 jar
+        // 处理 jar 的逻辑更简单些，他没有 changedFiles
         private void handle() throws IllegalAccessException, NoSuchFieldException, ClassNotFoundException, IOException {
             String traceClassOut = config.traceClassOut;
 
@@ -433,7 +499,9 @@ public class MatrixTraceTransform extends Transform {
                     jarInputOutMap.put(jarInput, jarOutput);
                 }
 
-            } else {
+            }
+            else {
+                // 专门用于 处理 WeChat AutoDex.jar 文件 可以略过，意义不大
                 Log.i(TAG, "Special case for WeChat AutoDex. Its rootInput jar file is actually a txt file contains path list.");
                 // Special case for WeChat AutoDex. Its rootInput jar file is actually
                 // a txt file contains path list.
