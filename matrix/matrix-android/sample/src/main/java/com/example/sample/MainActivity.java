@@ -89,15 +89,27 @@ public class MainActivity extends AppCompatActivity {
 //        B();
 //        C();
         D();
+        F();
     }
 
-
+    int F() {
+        int i = 0;
+        i++;
+        i++;
+        i++;
+        i++;
+        i++;
+        i++;
+        i++;
+        i++;
+        return i;
+    }
 
     void A() {
         SystemClock.sleep(100);
     }
 
-    void B () {
+    void B() {
         SystemClock.sleep(200);
     }
 

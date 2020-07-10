@@ -73,6 +73,7 @@ public class MethodCollector {
         List<Future> futures = new LinkedList<>();
 
         for (File srcFile : srcFolderList) {
+            // 将 文件/目录下 class ，全部放到 list 中
             ArrayList<File> classFileList = new ArrayList<>();
             if (srcFile.isDirectory()) {
                 listClassFiles(classFileList, srcFile);
@@ -80,15 +81,18 @@ public class MethodCollector {
                 classFileList.add(srcFile);
             }
 
+            // 每个 class 都分配一个 CollectSrcTask
             for (File classFile : classFileList) {
                 futures.add(executor.submit(new CollectSrcTask(classFile)));
             }
         }
 
+        // 每个 jar 分配一个 CollectJarTask
         for (File jarFile : dependencyJarList) {
             futures.add(executor.submit(new CollectJarTask(jarFile)));
         }
 
+        // 等待任务完成
         for (Future future : futures) {
             future.get();
         }
@@ -129,8 +133,13 @@ public class MethodCollector {
             InputStream is = null;
             try {
                 is = new FileInputStream(classFile);
+                // ASM 的使用
+                // 访问者模式，就是将对数据结构访问的操作分离出去
+                // 代价就是需要将数据结构本身传递进来
                 ClassReader classReader = new ClassReader(is);
+                // 修改字节码，有时候需要改动本地变量数与stack大小，自己计算麻烦，可以直接使用这个自动计算
                 ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                // ASM5 api版本
                 ClassVisitor visitor = new TraceClassAdapter(Opcodes.ASM5, classWriter);
                 classReader.accept(visitor, 0);
 
@@ -184,6 +193,7 @@ public class MethodCollector {
     }
 
 
+    // 将被忽略的 方法名 存入 ignoreMethodMapping.txt 中
     private void saveIgnoreCollectedMethod(MappingCollector mappingCollector) {
 
         File methodMapFile = new File(configuration.ignoreMethodMapFilePath);
@@ -194,6 +204,8 @@ public class MethodCollector {
         ignoreMethodList.addAll(collectedIgnoreMethodMap.values());
         Log.i(TAG, "[saveIgnoreCollectedMethod] size:%s path:%s", collectedIgnoreMethodMap.size(), methodMapFile.getAbsolutePath());
 
+
+        // 通过class名字进行排序
         Collections.sort(ignoreMethodList, new Comparator<TraceMethod>() {
             @Override
             public int compare(TraceMethod o1, TraceMethod o2) {
@@ -222,7 +234,7 @@ public class MethodCollector {
         }
     }
 
-
+    // 将被插桩的 方法名 存入 methodMapping.txt 中
     private void saveCollectedMethod(MappingCollector mappingCollector) {
         File methodMapFile = new File(configuration.methodMapFilePath);
         if (!methodMapFile.getParentFile().exists()) {
@@ -274,23 +286,32 @@ public class MethodCollector {
             super(i, classVisitor);
         }
 
+        /**
+         * 该方法是当扫描类时第一个调用的方法，主要用于类声明使用。
+         * 下面是对方法中各个参数的示意：
+         * visit( 类版本 , 修饰符 , 类名 , 泛型信息 , 继承的父类 , 实现的接口)
+         */
         @Override
         public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
             super.visit(version, access, name, signature, superName, interfaces);
             this.className = name;
+            // 是否抽象类
             if ((access & Opcodes.ACC_ABSTRACT) > 0 || (access & Opcodes.ACC_INTERFACE) > 0) {
                 this.isABSClass = true;
             }
+            // 保存父类，便于分析继承关系
             collectedClassExtendMap.put(className, superName);
         }
 
         @Override
         public MethodVisitor visitMethod(int access, String name, String desc,
                                          String signature, String[] exceptions) {
+            // 跳过抽象类，接口
             if (isABSClass) {
                 return super.visitMethod(access, name, desc, signature, exceptions);
             } else {
                 if (!hasWindowFocusMethod) {
+                    // 是否有 onWindowFocusChanged 方法，针对 activity 的
                     hasWindowFocusMethod = isWindowFocusChangeMethod(name, desc);
                 }
                 return new CollectMethodNode(className, access, name, desc, signature, exceptions);
@@ -314,12 +335,15 @@ public class MethodCollector {
             super.visitEnd();
             TraceMethod traceMethod = TraceMethod.create(0, access, className, name, desc);
 
+            // 是否构造方法
             if ("<init>".equals(name)) {
                 isConstructor = true;
             }
 
+            // 判断类是否 被配置在了 黑名单中
             boolean isNeedTrace = isNeedTrace(configuration, traceMethod.className, mappingCollector);
             // filter simple methods
+            // 跳过 空方法，get/set 方法，没有调用其他方法的方法，可以理解为叶子方法
             if ((isEmptyMethod() || isGetSetMethod() || isSingleMethod())
                     && isNeedTrace) {
                 ignoreCount.incrementAndGet();
@@ -327,6 +351,7 @@ public class MethodCollector {
                 return;
             }
 
+            // 不在黑名单中而且没在在methodMapping中配置过的方法加入待插桩的集合
             if (isNeedTrace && !collectedMethodMap.containsKey(traceMethod.getMethodName())) {
                 traceMethod.id = methodId.incrementAndGet();
                 collectedMethodMap.put(traceMethod.getMethodName(), traceMethod);
@@ -383,7 +408,6 @@ public class MethodCollector {
                 AbstractInsnNode insnNode = iterator.next();
                 int opcode = insnNode.getOpcode();
                 if (-1 == opcode) {
-                    continue;
                 } else if (Opcodes.INVOKEVIRTUAL <= opcode && opcode <= Opcodes.INVOKEDYNAMIC) {
                     return false;
                 }

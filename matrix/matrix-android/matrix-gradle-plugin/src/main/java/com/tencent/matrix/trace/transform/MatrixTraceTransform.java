@@ -252,7 +252,7 @@ public class MatrixTraceTransform extends Transform {
 
 
         /**
-         * step 2
+         * step 2 这里没有对输入输出做改变，只是扫描了一边，记录了一些信息，便于后续处理
          */
         start = System.currentTimeMillis();
         MethodCollector methodCollector = new MethodCollector(executor, mappingCollector, methodId, config, collectedMethodMap);
@@ -260,7 +260,7 @@ public class MatrixTraceTransform extends Transform {
         Log.i(TAG, "[doTransform] Step(2)[Collection]... cost:%sms", System.currentTimeMillis() - start);
 
         /**
-         * step 3
+         * step 3， 给方法插入 i o 方法，onWindowFocusChanged 插入 at 方法
          */
         start = System.currentTimeMillis();
         MethodTracer methodTracer = new MethodTracer(executor, mappingCollector, config, methodCollector.getCollectedMethodMap(), methodCollector.getCollectedClassExtendMap());

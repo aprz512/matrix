@@ -124,17 +124,21 @@ public class MethodTracer {
             InputStream is = null;
             FileOutputStream os = null;
             try {
+                // 原始文件
                 final String changedFileInputFullPath = classFile.getAbsolutePath();
+                // 插桩后文件
                 final File changedFileOutput = new File(changedFileInputFullPath.replace(input.getAbsolutePath(), output.getAbsolutePath()));
                 if (!changedFileOutput.exists()) {
                     changedFileOutput.getParentFile().mkdirs();
                 }
                 changedFileOutput.createNewFile();
 
+                // 需要插桩
                 if (MethodCollector.isNeedTraceFile(classFile.getName())) {
                     is = new FileInputStream(classFile);
                     ClassReader classReader = new ClassReader(is);
                     ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                    // 进行插桩
                     ClassVisitor classVisitor = new TraceClassAdapter(Opcodes.ASM5, classWriter);
                     classReader.accept(classVisitor, ClassReader.EXPAND_FRAMES);
                     is.close();
@@ -147,6 +151,8 @@ public class MethodTracer {
                     os.write(classWriter.toByteArray());
                     os.close();
                 } else {
+                    // 不需要插桩，直接copy
+                    // 一些 R，BuildConfig 等文件
                     FileUtil.copyFileUsingStream(classFile, changedFileOutput);
                 }
             } catch (Exception e) {
@@ -279,6 +285,7 @@ public class MethodTracer {
 
         @Override
         public void visitEnd() {
+            // 如果没有 onWindowFocusChanged 方法，则添加一个
             if (!hasWindowFocusMethod && isActivityOrSubClass && isNeedTrace) {
                 insertWindowFocusChangeMethod(cv, className);
             }
@@ -314,6 +321,7 @@ public class MethodTracer {
             if (traceMethod != null) {
                 traceMethodCount.incrementAndGet();
                 mv.visitLdcInsn(traceMethod.id);
+                // 插入 i 方法
                 mv.visitMethodInsn(INVOKESTATIC, TraceBuildConstants.MATRIX_TRACE_CLASS, "i", "(I)V", false);
             }
         }
@@ -340,6 +348,8 @@ public class MethodTracer {
         protected void onMethodExit(int opcode) {
             TraceMethod traceMethod = collectedMethodMap.get(methodName);
             if (traceMethod != null) {
+                // 如果该方法是 onWindowFocusChanged 方法
+                // 还需要插桩 at 方法
                 if (hasWindowFocusMethod && isActivityOrSubClass && isNeedTrace) {
                     TraceMethod windowFocusChangeMethod = TraceMethod.create(-1, Opcodes.ACC_PUBLIC, className,
                             TraceBuildConstants.MATRIX_TRACE_ON_WINDOW_FOCUS_METHOD, TraceBuildConstants.MATRIX_TRACE_ON_WINDOW_FOCUS_METHOD_ARGS);
@@ -348,6 +358,8 @@ public class MethodTracer {
                     }
                 }
 
+
+                // 插入 o 方法
                 traceMethodCount.incrementAndGet();
                 mv.visitLdcInsn(traceMethod.id);
                 mv.visitMethodInsn(INVOKESTATIC, TraceBuildConstants.MATRIX_TRACE_CLASS, "o", "(I)V", false);
@@ -385,6 +397,7 @@ public class MethodTracer {
         methodVisitor.visitVarInsn(Opcodes.ILOAD, 1);
         methodVisitor.visitMethodInsn(Opcodes.INVOKESPECIAL, TraceBuildConstants.MATRIX_TRACE_ACTIVITY_CLASS, TraceBuildConstants.MATRIX_TRACE_ON_WINDOW_FOCUS_METHOD,
                 TraceBuildConstants.MATRIX_TRACE_ON_WINDOW_FOCUS_METHOD_ARGS, false);
+        // 在添加的方法里面也要插桩
         traceWindowFocusChangeMethod(methodVisitor, classname);
         methodVisitor.visitInsn(Opcodes.RETURN);
         methodVisitor.visitMaxs(2, 2);
