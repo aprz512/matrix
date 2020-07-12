@@ -223,7 +223,9 @@ public class MatrixTraceTransform extends Transform {
 
         futures.add(executor.submit(new ParseMappingTask(mappingCollector, collectedMethodMap, methodId)));
 
+        // 储存 class 输入输出关系的
         Map<File, File> dirInputOutMap = new ConcurrentHashMap<>();
+        // 储存 jar 输入输出关系的
         Map<File, File> jarInputOutMap = new ConcurrentHashMap<>();
         Collection<TransformInput> inputs = transformInvocation.getInputs();
 
@@ -289,6 +291,7 @@ public class MatrixTraceTransform extends Transform {
 
                 File mappingFile = new File(config.mappingDir, "mapping.txt");
                 if (mappingFile.exists() && mappingFile.isFile()) {
+                    // 将 mapping 文件读入内存，记录混淆前后的映射关系
                     MappingReader mappingReader = new MappingReader(mappingFile);
                     mappingReader.read(mappingCollector);
                 }
@@ -296,6 +299,7 @@ public class MatrixTraceTransform extends Transform {
 
                 File baseMethodMapFile = new File(config.baseMethodMapPath);
                 getMethodFromBaseMethod(baseMethodMapFile, collectedMethodMap);
+                // 从 baseMethodMapFile 中读取的键值对，需要混淆一下
                 retraceMethodMap(mappingCollector, collectedMethodMap);
 
                 Log.i(TAG, "[ParseMappingTask#run] cost:%sms, black size:%s, collect %s method from %s", System.currentTimeMillis() - start, size, collectedMethodMap.size(), config.baseMethodMapPath);
@@ -320,6 +324,8 @@ public class MatrixTraceTransform extends Transform {
             retraceMethodMap.clear();
         }
 
+        // 这个文件里面配置的是需要被配置的插桩方法
+        // 看名字是配置父类方法？？？
         private void getMethodFromBaseMethod(File baseMethodFile, ConcurrentHashMap<String, TraceMethod> collectedMethodMap) {
             if (!baseMethodFile.exists()) {
                 Log.w(TAG, "[getMethodFromBaseMethod] not exist!%s", baseMethodFile.getAbsolutePath());

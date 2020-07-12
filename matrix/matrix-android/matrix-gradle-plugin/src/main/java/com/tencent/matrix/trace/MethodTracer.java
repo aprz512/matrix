@@ -91,6 +91,7 @@ public class MethodTracer {
                 futures.add(executor.submit(new Runnable() {
                     @Override
                     public void run() {
+                        // 因为之前已经在 CollectDirectoryInputTask 与 CollectJarInputTask 把输入输出关系对应好了
                         innerTraceMethodFromSrc(entry.getKey(), entry.getValue());
                     }
                 }));

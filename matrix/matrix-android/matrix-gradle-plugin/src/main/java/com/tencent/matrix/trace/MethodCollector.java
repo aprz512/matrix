@@ -242,6 +242,7 @@ public class MethodCollector {
         }
         List<TraceMethod> methodList = new ArrayList<>();
 
+        // 将 dispatchMessage 也写进去，因为在 UIThreadMonitor 手动调用这个方法（id） 的 i 与 o
         TraceMethod extra = TraceMethod.create(TraceBuildConstants.METHOD_ID_DISPATCH, Opcodes.ACC_PUBLIC, "android.os.Handler",
                 "dispatchMessage", "(Landroid.os.Message;)V");
         collectedMethodMap.put(extra.getMethodName(), extra);
@@ -351,7 +352,7 @@ public class MethodCollector {
                 return;
             }
 
-            // 不在黑名单中而且没在在methodMapping中配置过的方法加入待插桩的集合
+            // 不在黑名单中
             if (isNeedTrace && !collectedMethodMap.containsKey(traceMethod.getMethodName())) {
                 traceMethod.id = methodId.incrementAndGet();
                 collectedMethodMap.put(traceMethod.getMethodName(), traceMethod);

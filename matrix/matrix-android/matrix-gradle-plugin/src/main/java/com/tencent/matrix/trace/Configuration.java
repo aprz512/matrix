@@ -45,6 +45,8 @@ public class Configuration {
                     continue;
                 }
 
+                // blackListFile 里面是我们自己配置的，里面都是未混淆的类
+                // 所以需要将其转换为混淆之后的
                 if (black.startsWith("-keepclass ")) {
                     black = black.replace("-keepclass ", "");
                     blackSet.add(processor.proguardClassName(black, black));

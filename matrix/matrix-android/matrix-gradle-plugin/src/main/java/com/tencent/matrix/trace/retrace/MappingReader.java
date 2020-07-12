@@ -81,6 +81,7 @@ public class MappingReader {
      * @param line read content
      * @param mappingProcessor
      * @return
+     * android.arch.core.executor.ArchTaskExecutor -> android.arch.a.a.a:
      */
     private String parseClassMapping(String line, MappingProcessor mappingProcessor) {
 
@@ -95,7 +96,9 @@ public class MappingReader {
         }
 
         // trim the elements.
+        // android.arch.core.executor.ArchTaskExecutor
         String className = line.substring(0, leftIndex).trim();
+        // android.arch.a.a.a
         String newClassName = line.substring(leftIndex + offset, rightIndex).trim();
 
         // Process this class name mapping.

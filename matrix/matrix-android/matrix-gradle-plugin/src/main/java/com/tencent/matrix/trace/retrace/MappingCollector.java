@@ -38,8 +38,11 @@ public class MappingCollector implements MappingProcessor {
 
     @Override
     public boolean processClassMapping(String className, String newClassName) {
+        // 混淆后转原始
         this.mObfuscatedRawClassMap.put(newClassName, className);
+        // 原始转混淆后
         this.mRawObfuscatedClassMap.put(className, newClassName);
+        // 原始报名转混淆后报名
         this.mRawObfuscatedPackageMap.put(className.substring(0, className.lastIndexOf('.')), newClassName.substring(0, newClassName.lastIndexOf('.')));
         return true;
     }
