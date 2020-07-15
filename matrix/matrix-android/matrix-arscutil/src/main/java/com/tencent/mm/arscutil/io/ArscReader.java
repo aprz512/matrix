@@ -70,6 +70,7 @@ public class ArscReader {
         resTable.setGlobalStringPool(readStringBlock());
         Log.d(TAG, "global string pool pos %d", dataInput.getFilePointer());
         if (resTable.getPackageCount() > 0) {
+            // packageCount 一般就一个
             ResPackage[] packages = new ResPackage[resTable.getPackageCount()];
             for (int i = 0; i < resTable.getPackageCount(); i++) {
                 packages[i] = readPackage();
@@ -108,11 +109,13 @@ public class ArscReader {
         resPackage.setLastPublicName(dataInput.readInt());
         Log.d(TAG, "lastPublicName index %d", resPackage.getLastPublicName());
         resPackage.setHeadPaddingSize((int) (resPackage.getHeadSize() + headStart - dataInput.getFilePointer()));
+        // 读取资源类型 anim / dimen / attr 等
         if (resPackage.getResTypePoolOffset() > 0) {
             dataInput.seek(headStart + resPackage.getResTypePoolOffset());
             ResStringBlock resTypePool = readStringBlock();
             resPackage.setResTypePool(resTypePool);
         }
+        // 读取资源名 abc_fade_in / abc_fade_out 等
         if (resPackage.getResNamePoolOffset() > 0) {
             dataInput.seek(headStart + resPackage.getResNamePoolOffset());
             ResStringBlock resNamePool = readStringBlock();
@@ -315,6 +318,7 @@ public class ArscReader {
                 if (i < stringPool.getStringCount() - 1) {
                     buffer = new byte[stringPool.getStringOffsets().get(i + 1) - stringPool.getStringOffsets().get(i)];
                 } else {
+                    // 最后一个字符串的位置需要特殊计算一下，从 style 那里减
                     if (stringPool.getStyleCount() > 0) {
                         buffer = new byte[stringPool.getStyleStart() - (stringPool.getStringOffsets().get(i) + stringPool.getStringStart())];
                     } else {
@@ -329,6 +333,8 @@ public class ArscReader {
             }
             stringPool.setStrings(strings);
         }
+        // 没搞懂字符串样式是啥？
+        // 老罗的博客介绍的，我试了，但是样式还是为0
         if (stringPool.getStyleCount() > 0) {
             byte[] styleBytes = new byte[stringPool.getChunkSize() - stringPool.getStyleStart()];
             dataInput.read(styleBytes);

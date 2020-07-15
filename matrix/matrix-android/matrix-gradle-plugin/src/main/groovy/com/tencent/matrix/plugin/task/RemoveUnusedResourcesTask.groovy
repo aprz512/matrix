@@ -73,6 +73,9 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
         return resourceName;
     }
 
+    /**
+     *  @TaskAction 表示该Task要执行的动作,即在调用该Task时，该方法将被执行
+     */
     @TaskAction
     void removeResources() {
 
@@ -85,6 +88,7 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                     String unsignedApkPath = output.outputFile.getAbsolutePath();
                     Log.i(RemoveUnusedResourcesTask.TAG, "original apk file %s", unsignedApkPath);
                     long startTime = System.currentTimeMillis();
+                    // 符号表目录
                     removeUnusedResources(unsignedApkPath, project.getBuildDir().getAbsolutePath() + "/intermediates/symbols/${variant.name}/R.txt", variant.variantData.variantConfiguration.signingConfig);
                     Log.i(RemoveUnusedResourcesTask.TAG, "cost time %f s" , (System.currentTimeMillis() - startTime) / 1000.0f );
                 }
@@ -110,9 +114,13 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
             try {
                 File inputFile = new File(originalApk);
                 Set<String> ignoreRes = project.extensions.matrix.removeUnusedResources.ignoreResources;
+                // 加载配置的应该忽略的资源
                 for (String res : ignoreRes) {
+                    // 通配符转转正则表达式
+                    // 配置的语法应该支持 * 啥的吧
                     ignoreResources.add(Util.globToRegexp(res));
                 }
+                // 加载配置的 未使用的资源，这个选项很迷
                 Set<String> unusedResources = project.extensions.matrix.removeUnusedResources.unusedResources;
                 Iterator<String> iterator = unusedResources.iterator();
                 String res = null;
@@ -147,6 +155,7 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                 Map<String, Integer> removeResources = new HashMap<>();
                 for (String resName : unusedResources) {
                     if (!ignoreResource(resName)) {
+                        // 从 map 中移除，map 还要用于后面重写 R.txt 文件
                         removeResources.put(resName, resourceMap.remove(resName));
                     }
                 }
@@ -154,8 +163,11 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
 
                 for (ZipEntry zipEntry : zipInputFile.entries()) {
                     if (zipEntry.name.startsWith("res/")) {
+                        // zipEntry.name --> res/mipmap-hdpi-v4/ic_launcher_round.png
+                        // resourceName --> R.mipmap.ic_launcher_round.png
                         String resourceName = entryToResouceName(zipEntry.name);
                         if (!Util.isNullOrNil(resourceName)) {
+                            // 如果有配置了 unusedResources，这里就不拷贝这个资源到新的 apk 里面了
                             if (removeResources.containsKey(resourceName)) {
                                 Log.i(TAG, "remove unused resource %s", resourceName);
                                 continue;
@@ -166,9 +178,14 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                             addZipEntry(zipOutputStream, zipEntry, zipInputFile);
                         }
                     } else {
+                        // 为啥 META-INF/ 下的文件也不拷贝
+                        // 里面的几个签名文件可以不用管，因为后面会重新签名，但是还有别的文件呢
                         if (needSign && zipEntry.name.startsWith("META-INF/")) {
                             continue;
                         } else {
+                            // shrinkArsc 需要精简 arsc 文件，这是大头
+                            // 看这里的逻辑，unusedResources 必须配置才能生效，但是我咋知道哪些文件是未使用的！！！
+                            // 看 demo 的配置，是使用命令自动生成的
                             if (shrinkArsc && zipEntry.name.equalsIgnoreCase("resources.arsc") && unusedResources.size() > 0) {
                                 File srcArscFile = new File(inputFile.getParentFile().getAbsolutePath() + "/resources.arsc");
                                 File destArscFile = new File(inputFile.getParentFile().getAbsolutePath() + "/resources_shrinked.arsc");
@@ -176,13 +193,18 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                                     srcArscFile.delete();
                                     srcArscFile.createNewFile();
                                 }
+                                // 将 zip 文件中的 .asrs 文件解压出来
                                 unzipEntry(zipInputFile, zipEntry, srcArscFile);
 
+                                // 分析 .arsc 文件，需要一张图配合看
+                                // https://user-gold-cdn.xitu.io/2019/5/24/16ae9b85b2f4e918?imageView2/0/w/1280/h/960/format/webp/ignore-error/1
+                                // 或者使用 010 打开看看（推荐）
                                 ArscReader reader = new ArscReader(srcArscFile.getAbsolutePath());
                                 ResTable resTable = reader.readResourceTable();
                                 for (String resName : removeResources.keySet()) {
                                     ArscUtil.removeResource(resTable, removeResources.get(resName), resName);
                                 }
+                                // 重新生成 .arsc 文件
                                 ArscWriter writer = new ArscWriter(destArscFile.getAbsolutePath());
                                 writer.writeResTable(resTable);
                                 Log.i(TAG, "shrink resources.arsc size %f KB", (srcArscFile.length() - destArscFile.length()) / 1024.0);
@@ -200,6 +222,7 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
 
                 Log.i(TAG, "shrink apk size %f KB", (inputFile.length() - outputFile.length()) / 1024.0);
                 if (needSign) {
+                    // 调用 apksigner 程序，进行签名
                     Log.i(TAG, "resign apk...");
                     ProcessBuilder processBuilder = new ProcessBuilder();
                     processBuilder.command(apksigner, "sign", "-v",
@@ -220,6 +243,7 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                 outputFile.renameTo(new File(originalApk));
 
                 //modify R.txt to delete the removed resources
+                // 移除 styleable，只有完全没有使用到的才移除
                 if (!removeResources.isEmpty()) {
                     Iterator<String> styleableItera =  styleableMap.keySet().iterator();
                     while (styleableItera.hasNext()) {
@@ -298,6 +322,11 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
         }
     }
 
+    /**
+     * 将 R.txt 中的符号表内存读到map里面
+     * resourceMap 里面是 string id dimens 之类的东西
+     * styleableMap 里面是 styleable   --> {R.styleable.ViewBackgroundHelper: [{R.styleable.ViewBackgroundHelper_android_background,0x010100d4}, ...]}
+     */
     private void readResourceTxtFile(File resTxtFile, Map<String, Integer> resourceMap, Map<String, Pair<String, Integer>[]> styleableMap) throws IOException {
         BufferedReader bufferedReader = new BufferedReader(new FileReader(resTxtFile));
         String line = bufferedReader.readLine();
@@ -307,6 +336,10 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
         try {
             while (line != null) {
                 String[] columns = line.split(" ");
+
+                // int attr layout_editor_absoluteY 0x7f0200c5
+                // int id dimensions 0x7f070033
+                // ...
                 if (columns.length >= 4) {
                     final String resourceName = "R." + columns[1] + "." + columns[2];
                     if (!columns[0].endsWith("[]") && columns[3].startsWith("0x")) {
@@ -318,7 +351,9 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                         if (!Util.isNullOrNil(resId)) {
                             resourceMap.put(resourceName, Integer.decode(resId));
                         }
-                    } else if (columns[1].equals("styleable")) {
+                    }
+                    // int[] styleable ViewStubCompat { 0x010100d0, 0x010100f2, 0x010100f3 }
+                    else if (columns[1].equals("styleable")) {
                         if (columns[0].endsWith("[]")) {
                             if (columns.length > 5) {
                                 styleableAttrs.clear();
@@ -333,7 +368,9 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                                 }
                                 styleableMap.put(styleableName, new Pair<String, Integer>[styleableAttrs.size()]);
                             }
-                        } else {
+                        }
+                        // int styleable ViewBackgroundHelper_android_background 0
+                        else {
                             if (styleable && !Util.isNullOrNil(styleableName)) {
                                 final int index = Integer.parseInt(columns[3]);
                                 final String name = "R." + columns[1] + "." + columns[2];
