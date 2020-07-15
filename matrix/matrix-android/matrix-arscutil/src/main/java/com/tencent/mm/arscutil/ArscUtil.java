@@ -124,7 +124,7 @@ public class ArscUtil {
     }
 
     // 从 ResType 中移除指定资源，将 entry 置为 null，同时将 entry 的偏移置为 NO_ENTRY_INDEX，最后修正数据位置
-    // 感觉这里是不是应该继续往上遍历一下，因为有些资源删除了，对应的字符串资源也可以考虑移除（就是遍历代价有点大）
+    // 感觉这里是不是应该继续往上遍历一下，因为有些资源删除了，对应的字符串资源也可以考虑移除
     public static void removeResource(ResTable resTable, int resourceId, String resourceName) throws IOException {
         ResPackage resPackage = findResPackage(resTable, getPackageId(resourceId));
         if (resPackage != null) {
