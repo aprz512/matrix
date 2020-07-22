@@ -74,6 +74,7 @@ public class ManifestAnalyzeTask extends ApkTask {
             if (!FileUtil.isLegalFile(arscFile)) {
                 manifestParser = new ManifestParser(inputFile);
             } else {
+                // 使用的是 apktool 的api，读取 manifest 信息，还需要 arsc 文件
                 manifestParser = new ManifestParser(inputFile, arscFile);
             }
             TaskResult taskResult = TaskResultFactory.factory(getType(), TASK_RESULT_TYPE_JSON, config);
@@ -81,6 +82,7 @@ public class ManifestAnalyzeTask extends ApkTask {
                 return null;
             }
             long startTime = System.currentTimeMillis();
+            // 分析 manifest 文件
             JsonObject jsonObject = manifestParser.parse();
             Log.d(TAG, jsonObject.toString());
             ((TaskJsonResult) taskResult).add("manifest", jsonObject);

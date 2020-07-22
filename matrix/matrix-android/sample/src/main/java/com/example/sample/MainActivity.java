@@ -1,28 +1,22 @@
 package com.example.sample;
 
+import android.app.Activity;
 import android.os.Handler;
 import android.os.SystemClock;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-import com.tencent.matrix.Matrix;
-import com.tencent.matrix.plugin.Plugin;
-import com.tencent.matrix.plugin.PluginListener;
-import com.tencent.matrix.report.Issue;
-import com.tencent.matrix.trace.TracePlugin;
-import com.tencent.matrix.trace.config.TraceConfig;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Matrix.Builder builder = new Matrix.Builder(this.getApplication());
+/*        Matrix.Builder builder = new Matrix.Builder(this.getApplication());
         builder.patchListener(new PluginListener() {
             @Override
             public void onInit(Plugin plugin) {
@@ -67,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         builder.plugin(tracePlugin);
 
         Matrix.init(builder.build());
-        tracePlugin.start();
+        tracePlugin.start();*/
 
         Button test = findViewById(R.id.test);
         test.setOnClickListener(new View.OnClickListener() {

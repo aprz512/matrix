@@ -96,16 +96,23 @@ public class FindNonAlphaPngTask extends ApkTask {
                     findNonAlphaPng(tempFile);
                 }
             } else if (file.isFile() && file.getName().endsWith(ApkConstants.PNG_FILE_SUFFIX) && !file.getName().endsWith(ApkConstants.NINE_PNG)) {
+                // png 文件，但是不是 .9
+                // .9 图片需要透明度，所以直接跳过
                 BufferedImage bufferedImage = ImageIO.read(file);
+                // 如果 没有 alpha 通道
                 if (bufferedImage != null && bufferedImage.getColorModel() != null && !bufferedImage.getColorModel().hasAlpha()) {
+                    // 获取文件名
                     String filename = file.getAbsolutePath().substring(inputFile.getAbsolutePath().length() + 1);
+                    // 获取混淆前的文件名
                     if (entryNameMap.containsKey(filename)) {
                         filename = entryNameMap.get(filename);
                     }
                     long size = file.length();
                     if (entrySizeMap.containsKey(filename)) {
+                        // 获取文件大小
                         size = entrySizeMap.get(filename).getFirst();
                     }
+                    // 大于阈值，记录下来
                     if (size >= downLimitSize * ApkConstants.K1024) {
                         nonAlphaPngList.add(Pair.of(filename, file.length()));
                     }
@@ -116,20 +123,26 @@ public class FindNonAlphaPngTask extends ApkTask {
 
     @Override
     public TaskResult call() throws TaskExecuteException {
+        // 这里与之前的相比，多传递了一个参数，“r” 目录是个啥？？？
+        // 是 AndResGuard 混淆后，将 res -> r
+        // 但是如果你配置了 mappingFile 选项，可能不会混淆 res 目录
         File resDir = new File(inputFile, ApkConstants.RESOURCE_DIR_PROGUARD_NAME);
         TaskResult taskResult = null;
         try {
             taskResult = TaskResultFactory.factory(getType(), TaskResultFactory.TASK_RESULT_TYPE_JSON, config);
             long startTime = System.currentTimeMillis();
             if (resDir.exists() && resDir.isDirectory()) {
+                // 找所有不带透明度的 png 图片
                 findNonAlphaPng(resDir);
             } else {
+                // 如果没找到 r 目录，去 res 目录
                 resDir = new File(inputFile, ApkConstants.RESOURCE_DIR_NAME);
                 if (resDir.exists() && resDir.isDirectory()) {
                     findNonAlphaPng(resDir);
                 }
             }
 
+            // 将没有  alpha 通道的 png 文件，按照文件的大小排序
             Collections.sort(nonAlphaPngList, new Comparator<Pair<String, Long>>() {
                 @Override
                 public int compare(Pair<String, Long> entry1, Pair<String, Long> entry2) {

@@ -107,6 +107,9 @@ public class UnzipTask extends ApkTask {
         }
     }
 
+    /**
+     * 读取mapping文件
+     */
     private void readMappingTxtFile() throws IOException {
         if (mappingTxt != null) {
             BufferedReader bufferedReader = new BufferedReader(new FileReader(mappingTxt));
@@ -144,7 +147,11 @@ public class UnzipTask extends ApkTask {
         return "";
     }
 
-
+    /**
+     * 读取 resMapping 文件，使用 AndResGuard 会生成
+     * 需要接入一下，看看生成的文件长什么样子，否则看不懂逻辑
+     * @throws IOException
+     */
     private void readResMappingTxtFile() throws IOException {
         if (resMappingTxt != null) {
             BufferedReader bufferedReader = new BufferedReader(new FileReader(resMappingTxt));
@@ -159,6 +166,8 @@ public class UnzipTask extends ApkTask {
                         readResStart = true;
                         readPathStart = false;
                     } else if (readPathStart) {
+                        // 解析 res path mapping:
+                        //    res/anim -> res/a
                         String[] columns = line.split("->");
                         if (columns.length == 2) {
                             String before = columns[0].trim();
@@ -169,6 +178,8 @@ public class UnzipTask extends ApkTask {
                             }
                         }
                     } else if (readResStart) {
+                        // 解析 res id mapping:
+                        // andresguard.tencent.com.andresguard_example.flavor1.R.anim.abc_fade_in -> andresguard.tencent.com.andresguard_example.flavor1.R.anim.a
                         String[] columns = line.split("->");
                         if (columns.length == 2) {
                             String before = parseResourceNameFromResguard(columns[0].trim());
@@ -204,10 +215,19 @@ public class UnzipTask extends ApkTask {
         return "R." + type + "." + filename;
     }
 
+    /**
+     * dirName 是混淆后的目录
+     * 需要从 resDirMap 中获取混淆前的目录
+     * @param dirName
+     * @param filename
+     * @return
+     */
     private String reverseResguard(String dirName, String filename) {
         String outEntryName = "";
         if (resDirMap.containsKey(dirName)) {
             String newDirName = resDirMap.get(dirName);
+            // 根据混淆前的目录获取资源的名字
+            // res/layout/xxx -> R.layout.xxx
             final String resource = parseResourceNameFromPath(newDirName, filename);
             int suffixIndex = filename.indexOf('.');
             String suffix = "";
@@ -217,11 +237,13 @@ public class UnzipTask extends ApkTask {
             if (resguardMap.containsKey(resource)) {
                 int lastIndex =  resguardMap.get(resource).lastIndexOf('.');
                 if (lastIndex >= 0) {
+                    // filename 是资源混淆前的名字
                     filename = resguardMap.get(resource).substring(lastIndex + 1) + suffix;
                 }
             }
             outEntryName = newDirName + "/" + filename;
         }
+        // 最后返回的是未使用 AndResGuard 的原始资源名
         return outEntryName;
     }
 
@@ -238,6 +260,7 @@ public class UnzipTask extends ApkTask {
         File file = null;
         int index = entryName.lastIndexOf('/');
         if (index >= 0) {
+            // 资源文件的名字都是以 res/ 开头的，所以会走这里的逻辑
             filename = entryName.substring(index + 1);
             String dirName = entryName.substring(0, index);
             dir = new File(outputFile, dirName);
@@ -303,8 +326,10 @@ public class UnzipTask extends ApkTask {
 
             ((TaskJsonResult) taskResult).add("total-size", inputFile.length());
 
+            // 读 mappping 文件
             readMappingTxtFile();
             config.setProguardClassMap(proguardClassMap);
+            // 读 resource_mapping 文件
             readResMappingTxtFile();
             config.setResguardMap(resguardMap);
 
@@ -313,6 +338,8 @@ public class UnzipTask extends ApkTask {
             String outEntryName = "";
             while (entries.hasMoreElements()) {
                 ZipEntry entry = (ZipEntry) entries.nextElement();
+                // writeEntry 里面只是将文件解压出来了
+                // 返回的 outEntryName 是资源未混淆之前的名字
                 outEntryName = writeEntry(zipFile, entry);
                 if (!Util.isNullOrNil(outEntryName)) {
                     JsonObject fileItem = new JsonObject();

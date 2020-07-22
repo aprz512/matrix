@@ -109,6 +109,14 @@ public class CountClassTask extends ApkTask {
 
     }
 
+    /**
+     * 读取dex文件，
+     * 获取dex文件中的所有类
+     * 进行分组
+     * 然后输出
+     * @return
+     * @throws TaskExecuteException
+     */
     @Override
     public TaskResult call() throws TaskExecuteException {
         try {

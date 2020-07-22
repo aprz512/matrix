@@ -116,16 +116,27 @@ public class CountRTask extends ApkTask {
                 dexData.load();
                 dexFile.close();
                 ClassRef[] defClassRefs = dexData.getInternalReferences();
+                // 遍历dex中的类
                 for (ClassRef classRef : defClassRefs) {
+                    // 获取类名
                     String className = ApkUtil.getNormalClassName(classRef.getName());
                     if (classProguardMap.containsKey(className)) {
+                        // 根据混淆文件，获取未混淆类名
                         className = classProguardMap.get(className);
                     }
+                    // 去除内部类的后半部分
+                    // com.example.sample.R$styleable -> com.example.sample.R
                     String pureClassName = getOuterClassName(className);
+                    // 一个光 R 是个什么鬼？？？
+                    // 连包名都没有，java可以运行吗？
                     if (pureClassName.endsWith(".R") || "R".equals(pureClassName)) {
+                        // 获取该类的字段长度
                         if (!classesMap.containsKey(pureClassName)) {
                             classesMap.put(pureClassName, classRef.getFieldArray().length);
                         } else {
+                            // 累加内部类
+                            // com.example.sample.R$string
+                            // com.example.sample.R$layout
                             classesMap.put(pureClassName, classesMap.get(pureClassName) + classRef.getFieldArray().length);
                         }
                     }

@@ -74,7 +74,10 @@ public class DuplicateFileTask extends ApkTask {
         }
         md5Map = new HashMap<>();
         fileSizeList = new ArrayList<>();
+        // 下面两个变量是在 unzipTask 中赋值的
+        // entrySizeMap 储存的是该文件的压缩前后大小
         entrySizeMap = config.getEntrySizeMap();
+        // entryNameMap 储存的是文件混淆前后（AndResGuard）的名字
         entryNameMap = config.getEntryNameMap();
     }
 
@@ -83,6 +86,7 @@ public class DuplicateFileTask extends ApkTask {
             if (file.isDirectory()) {
                 File[] files = file.listFiles();
                 for (File resFile : files) {
+                    // 递归计算文件的 md5
                     computeMD5(resFile);
                 }
             } else {
@@ -97,19 +101,25 @@ public class DuplicateFileTask extends ApkTask {
                 }
                 inputStream.close();
                 if (totalRead > 0) {
+                    // 计算出文件的 md5
                     final String md5 = Util.byteArrayToHex(msgDigest.digest());
                     String filename = file.getAbsolutePath().substring(inputFile.getAbsolutePath().length() + 1);
+                    // 获取混淆之前的名字
                     if (entryNameMap.containsKey(filename)) {
                         filename = entryNameMap.get(filename);
                     }
                     if (!md5Map.containsKey(md5)) {
                         md5Map.put(md5, new ArrayList<String>());
+                        // 统计文件大小
                         if (entrySizeMap.containsKey(filename)) {
+                            // 文件重复就使用之前的数据
                             fileSizeList.add(Pair.of(md5, entrySizeMap.get(filename).getFirst()));
                         } else {
                             fileSizeList.add(Pair.of(md5, totalRead));
                         }
                     }
+                    // 统计所有文件的 md5
+                    // 一个 md5 对应一个 list
                     md5Map.get(md5).add(filename);
                 }
             }
@@ -126,6 +136,7 @@ public class DuplicateFileTask extends ApkTask {
 
             computeMD5(inputFile);
 
+            // 将 fileSizeList 进行 文件大小 排序
             Collections.sort(fileSizeList, new Comparator<Pair<String, Long>>() {
                 @Override
                 public int compare(Pair<String, Long> entry1, Pair<String, Long> entry2) {
@@ -142,6 +153,8 @@ public class DuplicateFileTask extends ApkTask {
             });
 
             for (Pair<String, Long> entry : fileSizeList) {
+                // 输出文件信息
+                // md5, size, 对应的文件列表
                 if (md5Map.get(entry.getFirst()).size() > 1) {
                     JsonObject jsonObject = new JsonObject();
                     jsonObject.addProperty("md5", entry.getFirst());

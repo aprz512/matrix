@@ -290,6 +290,8 @@ public class DexData {
     /**
      * Sets the "internal" flag on type IDs which are defined in the
      * DEX file or within the VM (e.g. primitive classes and arrays).
+     *
+     * 将dex内的class标记一下，出了自己dex内部的，还有基本类型与数组（虚拟机生成的类）
      */
     void markInternalClasses() {
         for (int i = mClassDefs.length - 1; i >= 0; i--) {
@@ -444,6 +446,7 @@ public class DexData {
             }
         }
 
+        // 这里还处理了class的字段与方法
         // add fields and methods to the appropriate class entry
         addInternalFieldReferences(sparseRefs);
         addInternalMethodReferences(sparseRefs);
@@ -680,6 +683,7 @@ public class DexData {
     static class TypeIdItem {
         public int descriptorIdx;       // index into string_ids
 
+        // 因为会有多个dex，里面并不是全是自己的类
         public boolean internal;        // defined within this DEX file?
     }
 

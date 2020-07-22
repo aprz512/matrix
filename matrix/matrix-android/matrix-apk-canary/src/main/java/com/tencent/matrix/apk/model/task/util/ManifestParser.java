@@ -22,7 +22,9 @@ import brut.androlib.res.decoder.AXmlResourceParser;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.tencent.matrix.javalib.util.Util;
+
 import org.xmlpull.v1.XmlPullParser;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -60,6 +62,20 @@ public class ManifestParser {
         resourceParser = ApkResourceDecoder.createAXmlParser(arscFile);
     }
 
+    /**
+     * 只解析了 manifest 里面的 root 节点信息
+     * "manifest": {
+     * "package": "andresguard.tencent.com.andresguard_example.flavor1",
+     * "android:minSdkVersion": "24",
+     * "android:targetSdkVersion": "26",
+     * "android:versionCode": "2",
+     * "android:versionName": "1.1"
+     * }
+     * <p>
+     *
+     * versionName 这些信息会最终会合并到 manifest 中，
+     * 还记得最早的Android，这些信息本来是写在 manifest 中的，可以在 intermediates 中看最终的 manifest
+     */
     public JsonObject parse() throws Exception {
 
         FileInputStream inputStream = null;

@@ -329,7 +329,8 @@ public final class ApkJob {
                     readConfigFile(configPath);
                 }
 
-            } else {
+            }
+            else {
 
                 String apkPath = "";
                 String mappingFilePath = "";
@@ -454,6 +455,7 @@ public final class ApkJob {
                             params.put(JobConstants.PARAM_R_TXT, inputDir + "/" + ApkConstants.DEFAULT_RTXT_FILENAME);
                         }
                     }
+                    // 创建命令输入的各个任务
                     ApkTask task = createTask(args[i], params);
                     if (task != null) {
                         taskList.add(task);
@@ -469,6 +471,7 @@ public final class ApkJob {
 
     public void run() throws  Exception {
         if (parseParams()) {
+            // 创建解压任务，是第一个任务，将 apk 解压
             ApkTask unzipTask = TaskFactory.factory(TaskFactory.TASK_TYPE_UNZIP, jobConfig, new HashMap<String, String>());
             preTasks.add(unzipTask);
             for (String format : jobConfig.getOutputFormatList()) {
@@ -488,12 +491,15 @@ public final class ApkJob {
     private void execute() throws Exception {
         try {
 
+            // 先执行 preTasks
             for (ApkTask preTask : preTasks) {
                 preTask.init();
+                // task 执行后的结果是 result
                 TaskResult taskResult = preTask.call();
                 if (taskResult != null) {
                     TaskResult formatResult = null;
                     for (JobResult jobResult : jobResults) {
+                        // 将 result 进行格式化输出，json 或者 html
                         formatResult = TaskResultFactory.transferTaskResult(taskResult.taskType, taskResult, jobResult.getFormat(), jobConfig);
                         if (formatResult != null) {
                             jobResult.addTaskResult(formatResult);
@@ -501,14 +507,19 @@ public final class ApkJob {
                     }
                 }
             }
+            // 再执行 taskList 中的 task
             for (ApkTask task : taskList) {
+                // 先执行 task 的 init 方法
                 task.init();
             }
+            // 然后在 executor 中正式执行任务
             List<Future<TaskResult>> futures = executor.invokeAll(taskList, timeoutSeconds, TimeUnit.SECONDS);
             for (Future<TaskResult> future : futures) {
+                // 等待执行结果
                 TaskResult taskResult = future.get();
                 if (taskResult != null) {
                     TaskResult formatResult = null;
+                    // 格式化结果
                     for (JobResult jobResult : jobResults) {
                         formatResult = TaskResultFactory.transferTaskResult(taskResult.taskType, taskResult, jobResult.getFormat(), jobConfig);
                         if (formatResult != null) {
@@ -519,6 +530,7 @@ public final class ApkJob {
             }
             executor.shutdownNow();
 
+            // 输出结果
             for (JobResult jobResult : jobResults) {
                 jobResult.output();
             }

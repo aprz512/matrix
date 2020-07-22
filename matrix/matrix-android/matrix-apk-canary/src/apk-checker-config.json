@@ -1,8 +1,8 @@
 {
-  "--apk":"/Users/jinqiuchen/SampleApplication/app/build/outputs/apk/release/AndResGuard_app-release-unsigned/app-release-unsigned_unsigned.apk",
-  "--mappingTxt":"/Users/jinqiuchen/SampleApplication/app/build/outputs/mapping/release/mapping.txt",
-  "--resMappingTxt":"/Users/jinqiuchen/SampleApplication/app/build/outputs/apk/release/AndResGuard_app-release-unsigned/resource_mapping_app-release-unsigned.txt",
-  "--output":"/Users/jinqiuchen/SampleApplication/app/build/outputs/apk-checker-result",
+  "--apk":"D:\\Android\\AndroidStudioProjects\\AndResGuard\\AndResGuard-example\\app\\build\\outputs\\apk\\flavor1Blue\\debug\\AndResGuard_app-flavor1-blue-debug\\app-flavor1-blue-debug_7zip_aligned_signed.apk",
+
+  "--resMappingTxt":"D:\\Android\\AndroidStudioProjects\\AndResGuard\\AndResGuard-example\\app\\build\\outputs\\apk\\flavor1Blue\\debug\\AndResGuard_app-flavor1-blue-debug\\resource_mapping_app-flavor1-blue-debug.txt",
+  "--output":"D:\\",
   "--format":"mm.html,mm.json",
   "--formatConfig":
   [
@@ -60,28 +60,9 @@
       "name":"-duplicatedFile"
     },
     {
-      "name":"-checkMultiSTL",
-      "--toolnm":"/Users/jinqiuchen/Library/Android/sdk/ndk-bundle/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-nm"
-    },
-    {
-      "name":"-unusedResources",
-      "--rTxt":"/Users/jinqiuchen/SampleApplication/app/build/intermediates/symbols/release/R.txt",
-      "--ignoreResources"
-      :["R.raw.*",
-        "R.style.*",
-        "R.styleable.*",
-        "R.attr.*",
-        "R.id.*",
-        "R.string.ignore_*"
-      ]
-    },
-    {
       "name":"-unusedAssets",
       "--ignoreAssets":["*.so" ]
-    },
-    {
-      "name":"-unstrippedSo",
-      "--toolnm":"/Users/jinqiuchen/Library/Android/sdk/ndk-bundle/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-nm"
     }
+
   ]
 }
