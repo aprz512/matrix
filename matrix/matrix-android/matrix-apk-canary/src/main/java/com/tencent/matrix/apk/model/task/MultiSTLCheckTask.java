@@ -67,7 +67,7 @@ public class MultiSTLCheckTask extends ApkTask {
             throw new TaskInitException(TAG + "---The path of tool 'nm' is not given!");
         } else {
             Pattern envPattern = Pattern.compile("(\\$[a-zA-Z_-]+)");
-            Matcher matcher =  envPattern.matcher(toolnmPath);
+            Matcher matcher = envPattern.matcher(toolnmPath);
             while (matcher.find()) {
                 if (!Util.isNullOrNil(matcher.group())) {
                     String env = System.getenv(matcher.group().substring(1));
@@ -91,6 +91,15 @@ public class MultiSTLCheckTask extends ApkTask {
 
     }
 
+    // 这里不熟悉 nm 工具。所以不太清楚在做什么
+    // 使用 arm-linux-androideabi-nm 分析指定的 so 文件，-D -C 参数
+    // 参数意义：https://manned.org/arm-linux-androideabi-nm/07ad85eb
+    // 判断输出的每一行内容
+    // 0001df70 T std::get_unexpected()
+    // 0001df50 T std::set_unexpected(void (*)())
+    // 00016780 T std::get_new_handler()
+    // 00016760 T std::set_new_handler(void (*)())
+    // 0001dd90 T std::current_exception()
     private boolean isStlLinked(File libFile) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder(toolnmPath, "-D", "-C", libFile.getAbsolutePath());
         Process process = processBuilder.start();

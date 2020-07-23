@@ -39,6 +39,11 @@ import static com.tencent.matrix.apk.model.task.TaskFactory.TASK_TYPE_CHECK_RESG
 
 public class ResProguardCheckTask extends ApkTask {
 
+    public static void main(String[] args) {
+        Pattern fileNamePattern = Pattern.compile("[a-z_0-9]{1,3}");
+        System.out.println(fileNamePattern.matcher("9_a").matches());
+    }
+
     private static final String TAG = "Matrix.ResProguardCheckTask";
 
     private File inputFile;
@@ -67,7 +72,9 @@ public class ResProguardCheckTask extends ApkTask {
     }
 
 
-
+    /**
+     * 判断资源文件是否混淆了
+     */
     @Override
     public TaskResult call() throws TaskExecuteException {
         File resDir = new File(inputFile, ApkConstants.RESOURCE_DIR_PROGUARD_NAME);
@@ -77,14 +84,17 @@ public class ResProguardCheckTask extends ApkTask {
                 return null;
             }
             long startTime = System.currentTimeMillis();
+            // res 变成了 r，直接返回 true
             if (resDir.exists() && resDir.isDirectory()) {
                 Log.i(TAG, "find resource directory " + resDir.getAbsolutePath());
                 ((TaskJsonResult) taskResult).add("hasResProguard", true);
             } else {
+                // 为 res 目录
                 resDir = new File(inputFile, ApkConstants.RESOURCE_DIR_NAME);
                 if (resDir.exists() && resDir.isDirectory()) {
                     File[] dirs = resDir.listFiles();
                     boolean hasProguard = true;
+                    // 用正则表达式来判断res目录下的目录名字，如果是 1-3 个字符，则 ok，是混淆过了的
                     for (File dir : dirs) {
                         if (dir.isDirectory() && !fileNamePattern.matcher(dir.getName()).matches()) {
                             hasProguard = false;

@@ -59,7 +59,7 @@ public class MethodCountTask extends ApkTask {
 
     private File inputFile;
     private String group = JobConstants.GROUP_PACKAGE;
-    private final List<String>           dexFileNameList;
+    private final List<String> dexFileNameList;
     private final List<RandomAccessFile> dexFileList;
     private final Map<String, Integer> classInternalMethod;
     private final Map<String, Integer> classExternalMethod;
@@ -96,8 +96,10 @@ public class MethodCountTask extends ApkTask {
             if (files != null) {
                 for (File file : files) {
                     if (file.isFile() && file.getName().endsWith(ApkConstants.DEX_FILE_SUFFIX)) {
+                        // 储存 dex 文件名的 list
                         dexFileNameList.add(file.getName());
                         RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
+                        // 储存 raf 的 list
                         dexFileList.add(randomAccessFile);
                     }
                 }
@@ -123,7 +125,9 @@ public class MethodCountTask extends ApkTask {
         pkgExternalMethod.clear();
         DexData dexData = new DexData(dexFile);
         dexData.load();
+        // 获取 dex 中的方法，在 struct method_id_list dex_method_ids 中储存
         MethodRef[] methodRefs = dexData.getMethodRefs();
+        // 获取不属于该 dex 的类
         ClassRef[] externalClassRefs = dexData.getExternalReferences();
         Map<String, String> proguardClassMap = config.getProguardClassMap();
         String className = null;
@@ -135,9 +139,11 @@ public class MethodCountTask extends ApkTask {
             if (className.indexOf('.') == -1) {
                 continue;
             }
+            // 将外部类的方法数置为0
             classExternalMethod.put(className, 0);
         }
         for (MethodRef methodRef : methodRefs) {
+            // 该方法所属的类
             className = ApkUtil.getNormalClassName(methodRef.getDeclClassName());
             if (proguardClassMap.containsKey(className)) {
                 className = proguardClassMap.get(className);
@@ -146,6 +152,8 @@ public class MethodCountTask extends ApkTask {
                 if (className.indexOf('.') == -1) {
                     continue;
                 }
+                // 将dex内部方法放到 classInternalMethod
+                // 将dex外部方法方法 classExternalMethod
                 if (classExternalMethod.containsKey(className)) {
                     classExternalMethod.put(className, classExternalMethod.get(className) + 1);
                 } else if (classInternalMethod.containsKey(className)) {
@@ -156,6 +164,7 @@ public class MethodCountTask extends ApkTask {
             }
         }
 
+        // 移除外部类（引用的方法为0的）
         //remove 0-method referenced class
         Iterator<String> iterator = classExternalMethod.keySet().iterator();
         while (iterator.hasNext()) {
@@ -203,8 +212,11 @@ public class MethodCountTask extends ApkTask {
             JsonArray jsonArray = new JsonArray();
             for (int i = 0; i < dexFileList.size(); i++) {
                 RandomAccessFile dexFile = dexFileList.get(i);
+                // 计算  dex 中方法数量
                 countDex(dexFile);
                 dexFile.close();
+                // 格式化输出，输出的样式跑一下demo就看的到了，下面的代码意义不大
+                // 有了上面的数据，想怎么输出就怎么输出
                 int totalInternalMethods = sumOfValue(classInternalMethod);
                 int totalExternalMethods = sumOfValue(classExternalMethod);
                 JsonObject jsonObject = new JsonObject();

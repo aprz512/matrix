@@ -73,7 +73,7 @@ public class UncompressedFileTask extends ApkTask {
         filterSuffix = new HashSet<>();
 
         if (params.containsKey(JobConstants.PARAM_SUFFIX) && !Util.isNullOrNil(params.get(JobConstants.PARAM_SUFFIX))) {
-            String[]  suffix = params.get(JobConstants.PARAM_SUFFIX).split(",");
+            String[] suffix = params.get(JobConstants.PARAM_SUFFIX).split(",");
             for (String suffixStr : suffix) {
                 filterSuffix.add(suffixStr.trim());
             }

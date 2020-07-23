@@ -19,6 +19,7 @@ package com.tencent.matrix.apk.model.result;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 

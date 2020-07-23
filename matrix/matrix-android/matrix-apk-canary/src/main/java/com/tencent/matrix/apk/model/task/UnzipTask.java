@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
 import static com.tencent.matrix.apk.model.result.TaskResultFactory.TASK_RESULT_TYPE_JSON;
 import static com.tencent.matrix.apk.model.task.TaskFactory.TASK_TYPE_UNZIP;
 
@@ -150,6 +151,7 @@ public class UnzipTask extends ApkTask {
     /**
      * 读取 resMapping 文件，使用 AndResGuard 会生成
      * 需要接入一下，看看生成的文件长什么样子，否则看不懂逻辑
+     *
      * @throws IOException
      */
     private void readResMappingTxtFile() throws IOException {
@@ -161,7 +163,7 @@ public class UnzipTask extends ApkTask {
                 boolean readPathStart = false;
                 while (line != null) {
                     if (line.trim().equals("res path mapping:")) {
-                      readPathStart = true;
+                        readPathStart = true;
                     } else if (line.trim().equals("res id mapping:")) {
                         readResStart = true;
                         readPathStart = false;
@@ -218,6 +220,7 @@ public class UnzipTask extends ApkTask {
     /**
      * dirName 是混淆后的目录
      * 需要从 resDirMap 中获取混淆前的目录
+     *
      * @param dirName
      * @param filename
      * @return
@@ -235,7 +238,7 @@ public class UnzipTask extends ApkTask {
                 suffix = filename.substring(suffixIndex);
             }
             if (resguardMap.containsKey(resource)) {
-                int lastIndex =  resguardMap.get(resource).lastIndexOf('.');
+                int lastIndex = resguardMap.get(resource).lastIndexOf('.');
                 if (lastIndex >= 0) {
                     // filename 是资源混淆前的名字
                     filename = resguardMap.get(resource).substring(lastIndex + 1) + suffix;

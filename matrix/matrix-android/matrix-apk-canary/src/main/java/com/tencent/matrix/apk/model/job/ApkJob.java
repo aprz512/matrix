@@ -67,9 +67,9 @@ public final class ApkJob {
 
     private ExecutorService executor;
     private static final int TIMEOUT_SECONDS = 600;
-    private              int timeoutSeconds  = TIMEOUT_SECONDS;
-    private static final int THREAD_NUM      = 1;
-    private              int threadNum       = THREAD_NUM;
+    private int timeoutSeconds = TIMEOUT_SECONDS;
+    private static final int THREAD_NUM = 1;
+    private int threadNum = THREAD_NUM;
 
     private List<ApkTask> preTasks;
     private List<ApkTask> taskList;
@@ -239,7 +239,7 @@ public final class ApkJob {
                 Attributes registry = manifest.getAttributes(JobConstants.TASK_RESULT_REGISTRY);
                 if (registry != null) {
                     String registryClassPath = registry.getValue(JobConstants.TASK_RESULT_REGISTERY_CLASS);
-                    ClassLoader classLoader = new URLClassLoader(new URL[] {file.toURL()});
+                    ClassLoader classLoader = new URLClassLoader(new URL[]{file.toURL()});
                     Class registryClass = classLoader.loadClass(registryClassPath);
                     TaskResultRegistry resultRegistry = (TaskResultRegistry) registryClass.newInstance();
                     TaskResultFactory.addCustomTaskJsonResult(resultRegistry.getJsonResult());
@@ -329,8 +329,7 @@ public final class ApkJob {
                     readConfigFile(configPath);
                 }
 
-            }
-            else {
+            } else {
 
                 String apkPath = "";
                 String mappingFilePath = "";
@@ -344,7 +343,7 @@ public final class ApkJob {
                             jobConfig.setInputDir(inputFile.getAbsolutePath());
                             for (File file : inputFile.listFiles()) {
                                 if (file.isFile() && file.getName().endsWith(ApkConstants.APK_FILE_SUFFIX)) {
-                                    apkPath =  file.getAbsolutePath();
+                                    apkPath = file.getAbsolutePath();
                                     break;
                                 }
                             }
@@ -469,7 +468,7 @@ public final class ApkJob {
         return true;
     }
 
-    public void run() throws  Exception {
+    public void run() throws Exception {
         if (parseParams()) {
             // 创建解压任务，是第一个任务，将 apk 解压
             ApkTask unzipTask = TaskFactory.factory(TaskFactory.TASK_TYPE_UNZIP, jobConfig, new HashMap<String, String>());

@@ -22,6 +22,7 @@ import com.google.gson.JsonObject;
 import com.tencent.matrix.apk.model.result.TaskHtmlResult;
 import com.tencent.matrix.apk.model.task.TaskFactory;
 import com.tencent.matrix.javalib.util.Util;
+
 import org.w3c.dom.Element;
 
 import java.util.Map;
@@ -37,16 +38,16 @@ public class MMTaskHtmlResult extends TaskHtmlResult {
     private static final int MAX_SHOW_ITEMS = 10;
     private static final String FOLDER_STYLE = "color:white;font-size:20px;background-color:#C0C0C0";
     private static final String FOLDER_ONCLICK = "root = this.parentNode.parentNode; "
-                                                + "next = root.nextSibling; "
-                                                + "while (next != null) { "
-                                                +    "if (next.hasAttribute('hidden')) { "
-                                                +        "next.removeAttribute('hidden');"
-                                                +   "} else { "
-                                                +        "break; "
-                                                +    "} "
-                                                +    "next = next.nextSibling; "
-                                                + "} "
-                                                + "root.parentNode.removeChild(root)";
+            + "next = root.nextSibling; "
+            + "while (next != null) { "
+            + "if (next.hasAttribute('hidden')) { "
+            + "next.removeAttribute('hidden');"
+            + "} else { "
+            + "break; "
+            + "} "
+            + "next = next.nextSibling; "
+            + "} "
+            + "root.parentNode.removeChild(root)";
 
     public MMTaskHtmlResult(int type, JsonObject config) throws ParserConfigurationException {
         super(type, config);

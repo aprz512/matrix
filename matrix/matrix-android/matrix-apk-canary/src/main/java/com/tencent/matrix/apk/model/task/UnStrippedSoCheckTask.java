@@ -67,7 +67,7 @@ public class UnStrippedSoCheckTask extends ApkTask {
             throw new TaskInitException(TAG + "---The path of tool 'nm' is not given!");
         } else {
             Pattern envPattern = Pattern.compile("(\\$[a-zA-Z_-]+)");
-            Matcher matcher =  envPattern.matcher(toolnmPath);
+            Matcher matcher = envPattern.matcher(toolnmPath);
             while (matcher.find()) {
                 if (!Util.isNullOrNil(matcher.group())) {
                     String env = System.getenv(matcher.group().substring(1));

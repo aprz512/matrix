@@ -119,7 +119,6 @@ public class XmlPullResourceRefDecoder implements ResStreamDecoder {
     }
 
 
-
     public Set<String> getResourceRefSet() {
         return resourceRefSet;
     }

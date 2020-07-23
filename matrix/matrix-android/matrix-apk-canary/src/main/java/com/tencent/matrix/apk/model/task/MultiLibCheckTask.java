@@ -67,6 +67,17 @@ public class MultiLibCheckTask extends ApkTask {
                 return null;
             }
             long startTime = System.currentTimeMillis();
+            // 这个 task 很简单，就是输出 lib 下的各个目录
+            //   "lib-dirs": [
+            //    "arm64-v8a",
+            //    "armeabi",
+            //    "armeabi-v7a",
+            //    "mips",
+            //    "mips64",
+            //    "x86",
+            //    "x86_64"
+            //  ],
+            //  "multi-lib": true,
             JsonArray jsonArray = new JsonArray();
             if (libDir.exists() && libDir.isDirectory()) {
                 File[] dirs = libDir.listFiles();

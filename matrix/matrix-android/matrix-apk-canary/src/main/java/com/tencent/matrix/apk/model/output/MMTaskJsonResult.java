@@ -72,7 +72,7 @@ public class MMTaskJsonResult extends TaskJsonResult {
             case TaskFactory.TASK_TYPE_COUNT_CLASS:
                 formatCountClass(jsonObjectInput, config);
                 break;
-            default :
+            default:
                 break;
         }
         if (jsonObjectOutput != null) {
@@ -187,7 +187,7 @@ public class MMTaskJsonResult extends TaskJsonResult {
 
         JsonObject manifest = jsonObject.getAsJsonObject("manifest");
 
-        Map<String, String>  attribute = new HashMap<>();
+        Map<String, String> attribute = new HashMap<>();
 
         if (manifest.has("package")) {
             attribute.put("package", manifest.get("package").getAsString());
@@ -259,8 +259,8 @@ public class MMTaskJsonResult extends TaskJsonResult {
             groups = config.getAsJsonArray("group");
         }
         //entries
-        Map<String, Integer>  defMethodMap = new HashMap<>();
-        Map<String, Integer>  refMethodMap = new HashMap<>();
+        Map<String, Integer> defMethodMap = new HashMap<>();
+        Map<String, Integer> refMethodMap = new HashMap<>();
 
         JsonArray dexFiles = jsonObject.getAsJsonArray("dex-files");
         for (JsonElement entry : dexFiles) {

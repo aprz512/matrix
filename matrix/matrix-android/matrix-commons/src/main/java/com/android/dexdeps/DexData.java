@@ -359,9 +359,11 @@ public class DexData {
      * that class.
      */
     public ClassRef[] getExternalReferences() {
+        // 创建一个与 mTypeIds 等大的数组
         // create a sparse array of ClassRef that parallels mTypeIds
         ClassRef[] sparseRefs = new ClassRef[mTypeIds.length];
 
+        // 找出 mTypeIds 中不属于本 dex 的类
         // create entries for all externally-referenced classes
         int count = 0;
         for (int i = 0; i < mTypeIds.length; i++) {
@@ -372,10 +374,14 @@ public class DexData {
             }
         }
 
+        // 给 ClassRef 关联对应的 字段 与 方法
         // add fields and methods to the appropriate class entry
         addExternalFieldReferences(sparseRefs);
         addExternalMethodReferences(sparseRefs);
 
+        // 压缩 sparseRefs 数组，去掉中间的 null 值，并返回
+        // 所以，这两步是否可以合并呢？？？
+        // 不行，因为 addExternalFieldReferences 的计算与 index 相关
         // crunch out the sparseness
         ClassRef[] classRefs = new ClassRef[count];
         int idx = 0;

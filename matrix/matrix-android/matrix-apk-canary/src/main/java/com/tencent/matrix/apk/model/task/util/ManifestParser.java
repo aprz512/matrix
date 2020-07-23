@@ -72,7 +72,7 @@ public class ManifestParser {
      * "android:versionName": "1.1"
      * }
      * <p>
-     *
+     * <p>
      * versionName 这些信息会最终会合并到 manifest 中，
      * 还记得最早的Android，这些信息本来是写在 manifest 中的，可以在 intermediates 中看最终的 manifest
      */

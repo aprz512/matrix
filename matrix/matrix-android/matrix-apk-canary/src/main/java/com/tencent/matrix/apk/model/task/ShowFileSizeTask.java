@@ -45,6 +45,7 @@ import static com.tencent.matrix.apk.model.task.TaskFactory.TASK_TYPE_SHOW_FILE_
 
 /**
  * Created by jinqiuchen on 17/6/1.
+ * 这个还是挺有用，可以找出ui切的大图
  */
 
 public class ShowFileSizeTask extends ApkTask {
@@ -52,7 +53,7 @@ public class ShowFileSizeTask extends ApkTask {
     private static final String TAG = "Matrix.ShowFileSizeTask";
     private File inputFile;
     private String order = JobConstants.ORDER_DESC;
-    private long             downLimit;
+    private long downLimit;
     private Set<String> filterSuffix;
     private List<Pair<String, Long>> entryList;
 
@@ -97,7 +98,7 @@ public class ShowFileSizeTask extends ApkTask {
         filterSuffix = new HashSet<>();
 
         if (params.containsKey(JobConstants.PARAM_SUFFIX) && !Util.isNullOrNil(params.get(JobConstants.PARAM_SUFFIX))) {
-            String[]  suffix = params.get(JobConstants.PARAM_SUFFIX).split(",");
+            String[] suffix = params.get(JobConstants.PARAM_SUFFIX).split(",");
             for (String suffixStr : suffix) {
                 filterSuffix.add(suffixStr.trim());
             }
@@ -119,9 +120,14 @@ public class ShowFileSizeTask extends ApkTask {
             Map<String, Pair<Long, Long>> entrySizeMap = config.getEntrySizeMap();
             if (!entrySizeMap.isEmpty()) {                                                          //take advantage of the result of UnzipTask.
                 for (Map.Entry<String, Pair<Long, Long>> entry : entrySizeMap.entrySet()) {
+                    // 文件后缀
                     final String suffix = getSuffix(entry.getKey());
                     Pair<Long, Long> size = entry.getValue();
+                    // 文件大小超过下限
                     if (size.getFirst() >= downLimit * ApkConstants.K1024) {
+                        // 有在参数指定该后缀，则统计
+                        // 没有指定任何后缀，也统计
+                        // 否则，忽略
                         if (filterSuffix.isEmpty() || filterSuffix.contains(suffix)) {
                             entryList.add(Pair.of(entry.getKey(), size.getFirst()));
                         } else {
@@ -133,6 +139,7 @@ public class ShowFileSizeTask extends ApkTask {
                 }
             }
 
+            // 排序
             Collections.sort(entryList, new Comparator<Pair<String, Long>>() {
                 @Override
                 public int compare(Pair<String, Long> entry1, Pair<String, Long> entry2) {
@@ -156,6 +163,16 @@ public class ShowFileSizeTask extends ApkTask {
                 }
             });
 
+            //  "files": [
+            //    {
+            //      "entry-name": "resources.arsc",
+            //      "entry-size": 180596
+            //    },
+            //    {
+            //      "entry-name": "res/mipmap-xxxhdpi-v4/ic_launcher.png",
+            //      "entry-size": 10486
+            //    }
+            //  ],
             JsonArray jsonArray = new JsonArray();
             for (Pair<String, Long> sortFile : entryList) {
                 JsonObject fileItem = new JsonObject();

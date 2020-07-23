@@ -68,7 +68,6 @@ public final class TaskFactory {
             "Count classes in dex file, output results group by package name."));
 
 
-
     public static final List<String> TaskOptionName = Collections.unmodifiableList(Arrays.asList(
             "", "",
             JobConstants.OPTION_MANIFEST,

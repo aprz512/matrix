@@ -90,7 +90,7 @@ public final class TaskResultFactory {
                     result = source;
                 }
             }
-        } catch (ParserConfigurationException | InstantiationException |  IllegalAccessException |  NoSuchMethodException | InvocationTargetException e) {
+        } catch (ParserConfigurationException | InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
             Log.e(TAG, "transfer task result failed! " + e.getMessage());
             result = null;
         }

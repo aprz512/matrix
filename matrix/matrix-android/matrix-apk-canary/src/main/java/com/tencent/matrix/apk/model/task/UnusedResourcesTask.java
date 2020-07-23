@@ -32,6 +32,7 @@ import com.tencent.matrix.apk.model.task.util.ApkUtil;
 import com.tencent.matrix.javalib.util.FileUtil;
 import com.tencent.matrix.javalib.util.Log;
 import com.tencent.matrix.javalib.util.Util;
+
 import org.jf.baksmali.BaksmaliOptions;
 import org.jf.dexlib2.DexFileFactory;
 import org.jf.dexlib2.Opcodes;
@@ -349,7 +350,7 @@ public class UnusedResourcesTask extends ApkTask {
                     arrayData = true;
                 } else if (line.startsWith(".end array-data")) {
                     arrayData = false;
-                } else  {
+                } else {
                     if (arrayData) {
                         String[] columns = line.split(" ");
                         if (columns.length > 0) {
@@ -384,11 +385,11 @@ public class UnusedResourcesTask extends ApkTask {
         for (String resource : fileResMap.keySet()) {
             Set<String> result = new HashSet<>();
             for (String resName : fileResMap.get(resource)) {
-               if (resguardMap.containsKey(resName)) {
-                   result.add(resguardMap.get(resName));
-               } else {
-                   result.add(resName);
-               }
+                if (resguardMap.containsKey(resName)) {
+                    result.add(resguardMap.get(resName));
+                } else {
+                    result.add(resName);
+                }
             }
             if (resguardMap.containsKey(resource)) {
                 nonValueReferences.put(resguardMap.get(resource), result);

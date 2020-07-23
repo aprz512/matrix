@@ -23,6 +23,7 @@ import com.tencent.matrix.javalib.util.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -52,8 +53,8 @@ import brut.androlib.res.xml.ResValuesXmlSerializable;
  * This decoder is used to decode binary resources (xml files and resources.arsc) in apk.
  * We use the ApkTool
  * <p>
- *  Copyright (C) 2017 Ryszard Wiśniewski <brut.alll@gmail.com>
- *  Copyright (C) 2017 Connor Tumbleson <connor.tumbleson@gmail.com>
+ * Copyright (C) 2017 Ryszard Wiśniewski <brut.alll@gmail.com>
+ * Copyright (C) 2017 Connor Tumbleson <connor.tumbleson@gmail.com>
  * <p>
  * to decode binary resources (xml files and resources.arsc).
  */
@@ -68,7 +69,7 @@ public class ApkResourceDecoder {
 
     public static AXmlResourceParser createAXmlParser() {
         AXmlResourceParser resourceParser = new AXmlResourceParser();
-        ResTable resTable =  new ResTable();
+        ResTable resTable = new ResTable();
         resourceParser.setAttrDecoder(new ResAttrDecoder());
         resourceParser.getAttrDecoder().setCurrentPackage(new ResPackage(resTable, 0, null));
         return resourceParser;
@@ -87,7 +88,7 @@ public class ApkResourceDecoder {
             BufferedInputStream inputStream = new BufferedInputStream(new FileInputStream(file));
             try {
                 try {
-                    ResPackage[] resPackages =  ARSCDecoder.decode(inputStream, false, true, resTable).getPackages();
+                    ResPackage[] resPackages = ARSCDecoder.decode(inputStream, false, true, resTable).getPackages();
                     ResPackage mainPackage = getMainPackage(resPackages);
                     if (mainPackage != null) {
                         resTable.addPackage(mainPackage, true);
@@ -260,7 +261,6 @@ public class ApkResourceDecoder {
         serializer.setDisabledAttrEscape(true);
         return serializer;
     }
-
 
 
 }
