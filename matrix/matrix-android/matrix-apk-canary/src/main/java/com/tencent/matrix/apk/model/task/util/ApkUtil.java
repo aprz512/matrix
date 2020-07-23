@@ -114,7 +114,8 @@ public class ApkUtil {
             return null;
         }
 
-
+        // 是 apktool 里面的东西，需要熟悉一下 api
+        // 使用 ClassDef 生成 ClassDefinition
         //create and initialize the top level string template
         ClassDefinition classDefinition = new ClassDefinition(options, classDef);
 
@@ -125,9 +126,13 @@ public class ApkUtil {
 
             BufferedWriter bufWriter = new BufferedWriter(new OutputStreamWriter(baos, "UTF8"));
 
+            // 加上 intent
             writer = new IndentingWriter(bufWriter);
+            // 将 class信息以字符串的形式写出去，这里写出去的不是 java 的类一样的东西
+            // 而是 dex 反编译出来的 smali 代码
             classDefinition.writeTo((IndentingWriter) writer);
             writer.flush();
+            // 以换行符分割
             return baos.toString().split("\n");
         } catch (Exception ex) {
             Log.e(TAG, "\n\nError occurred while disassembling class " + classDescriptor.replace('/', '.') + " - skipping class");

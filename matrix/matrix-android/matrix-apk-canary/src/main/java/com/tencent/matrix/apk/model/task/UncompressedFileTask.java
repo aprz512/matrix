@@ -41,6 +41,7 @@ import static com.tencent.matrix.apk.model.task.TaskFactory.TASK_TYPE_UNCOMPRESS
 
 /**
  * Created by jinqiuchen on 17/6/21.
+ * 该任务是输出压缩前后大小仍然相等的文件
  */
 
 public class UncompressedFileTask extends ApkTask {
@@ -105,6 +106,8 @@ public class UncompressedFileTask extends ApkTask {
                 for (Map.Entry<String, Pair<Long, Long>> entry : entrySizeMap.entrySet()) {
                     final String suffix = getSuffix(entry.getKey());
                     Pair<Long, Long> size = entry.getValue();
+                    // 将压缩前的文件放入 uncompressSizeMap
+                    // 将压缩后的文件放入 compressSizeMap
                     if (filterSuffix.isEmpty() || filterSuffix.contains(suffix)) {
                         if (!uncompressSizeMap.containsKey(suffix)) {
                             uncompressSizeMap.put(suffix, size.getFirst());
@@ -122,6 +125,7 @@ public class UncompressedFileTask extends ApkTask {
                 }
             }
 
+            // 判断压缩前后的文件大小是否相等
             for (String suffix : uncompressSizeMap.keySet()) {
                 if (uncompressSizeMap.get(suffix).equals(compressSizeMap.get(suffix))) {
                     JsonObject fileItem = new JsonObject();

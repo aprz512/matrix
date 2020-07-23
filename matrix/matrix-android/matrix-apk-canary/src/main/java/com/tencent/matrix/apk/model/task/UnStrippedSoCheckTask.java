@@ -48,6 +48,24 @@ import static com.tencent.matrix.apk.model.task.TaskFactory.TASK_TYPE_UNSTRIPPED
 
 public class UnStrippedSoCheckTask extends ApkTask {
 
+    public static void main(String[] args) {
+        Pattern envPattern = Pattern.compile("(\\$[a-zA-Z_-]+)");
+        String toolnmPath = "/Users/jinqiuchen/Library/Android/sdk/ndk-bundle/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-nm";
+        Matcher matcher = envPattern.matcher(toolnmPath);
+        while (matcher.find()) {
+            System.out.println(matcher);
+            if (!Util.isNullOrNil(matcher.group())) {
+                String env = System.getenv(matcher.group().substring(1));
+                System.out.println( matcher.group().substring(1) + "->" + env);
+                if (!Util.isNullOrNil(env)) {
+                    toolnmPath = toolnmPath.replace(matcher.group(), env);
+                }
+            }
+        }
+
+       System.out.println(toolnmPath);
+    }
+
     private static final String TAG = "Matrix.UnStrippedSoCheckTask";
 
     private File libDir;
@@ -92,11 +110,14 @@ public class UnStrippedSoCheckTask extends ApkTask {
     }
 
     private boolean isSoStripped(File libFile) throws IOException, InterruptedException {
+        // 使用 arm-linux-androideabi-nm 分析指定的 so 文件，不带参数
         ProcessBuilder processBuilder = new ProcessBuilder(toolnmPath, libFile.getAbsolutePath());
         Process process = processBuilder.start();
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
         String line = reader.readLine();
         boolean result = false;
+        // aarch64-linux-android-nm: libcrashlytics.so: no symbols
+        // 如果输出上面的信息，则通过，当然这里我是不太懂到底是个啥
         if (!Util.isNullOrNil(line)) {
             Log.d(TAG, "%s", line);
             String[] columns = line.split(":");
@@ -119,6 +140,8 @@ public class UnStrippedSoCheckTask extends ApkTask {
             long startTime = System.currentTimeMillis();
             List<File> libFiles = new ArrayList<>();
             JsonArray jsonArray = new JsonArray();
+
+            // 收集 .so 文件
             if (libDir.exists() && libDir.isDirectory()) {
                 File[] dirs = libDir.listFiles();
                 for (File dir : dirs) {
