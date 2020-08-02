@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -171,15 +172,30 @@ public class ApkResourceDecoder {
                 return;
             }
 
+            // 只处理 .xml 文件
             if (!inFileName.endsWith(".xml")) {
 //                Log.d(TAG, "Not xml file %s, type %s", inFileName, typeName);
                 return;
             }
 
+            // 对 api 不太熟，
+            // 大致为 分析 xml 中引用的资源文件
+            // 比如：使用的字符串，图片等资源
+            // 寻找以 @ 开头的 ：android:text="@string/app_name"
+            // 寻找以  ?attr 开头的
             FileInputStream inputStream = new FileInputStream(inFile);
             XmlPullResourceRefDecoder xmlDecoder = new XmlPullResourceRefDecoder(xmlParser);
             xmlDecoder.decode(inputStream, null);
             String resource = ApkConstants.R_PREFIX + typeName + "." + inFile.getName().substring(0, inFile.getName().lastIndexOf('.'));
+//            Log.d("decodeResResource", "resource = " + resource);
+
+//            if (resource.equals("R.drawable.abc_ic_voice_search_api_material")) {
+//                Iterator<String> iterator = xmlDecoder.getResourceRefSet().iterator();
+//                while (iterator.hasNext()) {
+//                    Log.d("abc_ic_voice_search_api_material", iterator.next());
+//                }
+//            }
+
             if (!nonValueReferences.containsKey(resource)) {
                 nonValueReferences.put(resource, xmlDecoder.getResourceRefSet());
             } else {
@@ -213,6 +229,18 @@ public class ApkResourceDecoder {
         XmlPullResourceRefDecoder xmlDecoder = new XmlPullResourceRefDecoder(xmlParser);
         xmlDecoder.decode(inputStream, null);
         references.addAll(xmlDecoder.getResourceRefSet());
+//                Log.d("decodeResValues", "path = " + resValuesFile.getPath());
+//        if (resValuesFile.getPath().equals("values/strings.xml")) {
+            Log.d("decodeResValues", "s------------------------------");
+            Set<String> resourceRefSet = xmlDecoder.getResourceRefSet();
+            Iterator<String> iterator = resourceRefSet.iterator();
+            while (iterator.hasNext()) {
+                String next = iterator.next();
+                Log.d("decodeResValues", "next = " + next);
+            }
+            Log.d("decodeResValues", "e------------------------------");
+//        }
+
     }
 
     public static void decodeResourcesRef(File manifestFile, File arscFile, File resDir, Map<String, Set<String>> nonValueReferences, Set<String> valueReferences) throws IOException, AndrolibException, XmlPullParserException {
@@ -234,15 +262,27 @@ public class ApkResourceDecoder {
             ExtMXSerializer serializer = createXmlSerializer();
             for (ResPackage pkg : resTable.listMainPackages()) {
                 aXmlResourceParser.getAttrDecoder().setCurrentPackage(pkg);
+                // 这里是读取的引用了资源的 xml
+                // layout
+                // drawable
+                // anim
+                // menu
+                // animator
+                // color
+                // 等等
                 for (ResResource resSource : pkg.listFiles()) {
                     decodeResResource(resSource, resDir, aXmlResourceParser, nonValueReferences);
                 }
 
+                // 这里感觉像是直接读取的 values 下的文件
+                // 以 resource 为标签的 xml 文件
                 for (ResValuesFile valuesFile : pkg.listValuesFiles()) {
+                    Log.e("ResValuesFile", "path = " + valuesFile.getPath());
                     decodeResValues(valuesFile, xmlPullParser, serializer, valueReferences);
                 }
             }
 
+            // 获取 manifest 引用的资源
             //decode manifest file
             XmlPullResourceRefDecoder xmlDecoder = new XmlPullResourceRefDecoder(aXmlResourceParser);
             InputStream inputStream = new FileInputStream(manifestFile);

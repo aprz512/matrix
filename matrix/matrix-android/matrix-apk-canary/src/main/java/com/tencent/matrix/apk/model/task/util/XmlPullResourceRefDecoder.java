@@ -16,6 +16,7 @@
 
 package com.tencent.matrix.apk.model.task.util;
 
+import com.tencent.matrix.javalib.util.Log;
 import com.tencent.matrix.javalib.util.Util;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -74,6 +75,8 @@ public class XmlPullResourceRefDecoder implements ResStreamDecoder {
 
     private void handleElement() {
         String tagName = mParser.getName();
+//        Log.d(TAG, "s----------------------");
+//        Log.d(TAG, "tagName= %s", tagName);
         int pointIndex = tagName.lastIndexOf('.');
         if (pointIndex >= 0) {
             tagName = tagName.substring(pointIndex + 1);
@@ -81,7 +84,11 @@ public class XmlPullResourceRefDecoder implements ResStreamDecoder {
         if (!Util.isNullOrNil(tagName)) {
             for (int i = 0; i < mParser.getAttributeCount(); i++) {
                 String value = mParser.getAttributeValue(i);
-                //Log.d(TAG, "attribute %s, %s", name, value);
+                String attributeName = mParser.getAttributeName(i);
+//                if (attributeName.equals("text")) {
+//                    Log.d(TAG, "tagName= %s value = %s", tagName, value);
+//                    Log.d(TAG, "e======================================");
+//                }
                 if (!Util.isNullOrNil(value)) {
                     if (value.startsWith("@")) {
                         int index = value.indexOf('/');
@@ -102,6 +109,7 @@ public class XmlPullResourceRefDecoder implements ResStreamDecoder {
 
     private void handleContent() {
         String text = mParser.getText();
+//        Log.d(TAG, "text= %s", text);
         if (!Util.isNullOrNil(text)) {
             if (text.startsWith("@")) {
                 int index = text.indexOf('/');

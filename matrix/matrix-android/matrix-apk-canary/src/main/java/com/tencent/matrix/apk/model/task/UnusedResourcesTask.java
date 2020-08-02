@@ -68,8 +68,17 @@ public class UnusedResourcesTask extends ApkTask {
     private File mappingTxt;
     private File resMappingTxt;
     private final List<String> dexFileNameList;
+
+    // key 混淆后
+    // value 混淆前
     private final Map<String, String> rclassProguardMap;
+
+    // key  资源 id -- 0x7f020001
+    // value 资源名
     private final Map<String, String> resourceDefMap;
+
+    // key 资源名
+    // value attr 的资源id
     private final Map<String, Set<String>> styleableMap;
     private final Set<String> resourceRefSet;
     private final Set<String> unusedResSet;
@@ -297,6 +306,8 @@ public class UnusedResourcesTask extends ApkTask {
 
         2. sget
 
+        // app 生成的是 static int 的，所以直接转换为了数值
+        // 但是 lib 里面不是  final 的，所以会是引用的方式
         sget v6, Lcom/tencent/mm/R$string;->chatting_long_click_menu_revoke_msg:I
         sget v1, Lcom/tencent/mm/libmmui/R$id;->property_anim:I
 
@@ -312,6 +323,8 @@ public class UnusedResourcesTask extends ApkTask {
             0x7f0a0023
         .end array-data
 
+
+
     */
 
     private void readSmaliLines(String[] lines) {
@@ -322,6 +335,8 @@ public class UnusedResourcesTask extends ApkTask {
         for (String line : lines) {
             line = line.trim();
             if (!Util.isNullOrNil(line)) {
+                // 直接使用资源id
+                // 似乎没有考虑          // const-string v1, "activity_main" 这样的情况啊
                 if (line.startsWith("const")) {
                     String[] columns = line.split(" ");
                     if (columns.length >= 3) {
@@ -331,6 +346,9 @@ public class UnusedResourcesTask extends ApkTask {
                         }
                     }
                 } else if (line.startsWith("sget")) {
+
+                    // 使用自定义属性，反编译出来的是这样的
+                    // sget-object v0, Lcom/example/sample/R$styleable;->FloatFrameView:[I
                     String[] columns = line.split(" ");
                     if (columns.length >= 3) {
                         final String resourceRef = parseResourceNameFromProguard(columns[2].trim());
@@ -338,6 +356,9 @@ public class UnusedResourcesTask extends ApkTask {
                             Log.d(TAG, "find resource reference %s", resourceRef);
                             if (styleableMap.containsKey(resourceRef)) {
                                 //reference of R.styleable.XXX
+                                // 添加 styleable 的各个属性
+                                // 先从 resourceDefMap 中根据 id 值，获取名字
+                                // 然后将名字存入 resourceRefSet
                                 for (String attr : styleableMap.get(resourceRef)) {
                                     resourceRefSet.add(resourceDefMap.get(attr));
                                 }
@@ -367,6 +388,14 @@ public class UnusedResourcesTask extends ApkTask {
     }
 
 
+    /**
+     * 啃到硬骨头了
+     * 本来想不使用 appcompat 包里面的东西，资源好分析一些
+     * 但是，不知道为啥，build/intermediates/symbols/xxx/R.txt 就生成不出来了
+     * 所以就不深入研究 ApkResourceDecoder.decodeResourcesRef 这个里面到底搞了啥了
+     *
+     *
+     */
     private void decodeResources() throws IOException, InterruptedException, AndrolibException, XmlPullParserException {
         File manifestFile = new File(inputFile, ApkConstants.MANIFEST_FILE_NAME);
         File arscFile = new File(inputFile, ApkConstants.ARSC_FILE_NAME);
@@ -382,9 +411,17 @@ public class UnusedResourcesTask extends ApkTask {
 
         Map<String, String> resguardMap = config.getResguardMap();
 
+        // fileResMap 储存的是：
+        // key 资源文件名字 --- R.drawable.abc_ic_voice_search_api_material
+        // value 是该资源文件中引用的其他资源名字： R.android:color.white
+        // R.drawable.abc_ic_voice_search_api_material 这个文件还引用了 attr 才对，怎么没有输出呢？
+        // 打印出来发现 ?attr/xxxx 经过编译之后，变成了 ？xxx
+        // 所以，就没有添加到集合中去，那么问题来了 XmlPullResourceRefDecoder 为啥要判断 /
         for (String resource : fileResMap.keySet()) {
             Set<String> result = new HashSet<>();
+//            Log.e("-------", "resource = " + resource);
             for (String resName : fileResMap.get(resource)) {
+//                Log.e("-------", "resName = " + resName);
                 if (resguardMap.containsKey(resName)) {
                     result.add(resguardMap.get(resName));
                 } else {
@@ -398,6 +435,9 @@ public class UnusedResourcesTask extends ApkTask {
             }
         }
 
+
+        // values 有 n 个文件夹 ： values-pl values-v24 等等
+        // 判断里面的 item 有没有使用 @ 或者 attr 方式的，有就添加进来
         for (String resource : valuesReferences) {
             if (resguardMap.containsKey(resource)) {
                 resourceRefSet.add(resguardMap.get(resource));
@@ -406,10 +446,12 @@ public class UnusedResourcesTask extends ApkTask {
             }
         }
 
+        // resourceRefSet 现在储存的是 values 里面的引用的资源 + 代码中使用的资源
         for (String resource : resourceRefSet) {
             readChildReference(resource);
         }
 
+        // 将需要忽略的资源添加到 resourceRefSet
         for (String resource : unusedResSet) {
             if (ignoreResource(resource)) {
                 resourceRefSet.add(resource);
@@ -427,10 +469,19 @@ public class UnusedResourcesTask extends ApkTask {
         return false;
     }
 
+    /**
+     * 深度遍历资源引用关系
+     * 以代码里面的资源引用 + values 的资源引用为根，遍历资源
+     * 非 values 的资源大都在代码中被使用，其余的也是互相引用，所以根的逻辑没问题
+     * 比如：R.layout.activity_main，它肯定是在代码中被使用
+     */
     private void readChildReference(String resource) throws IllegalStateException {
         if (nonValueReferences.containsKey(resource)) {
             visitPath.push(resource);
+            // 获取该资源引用的其他资源
             Set<String> childReference = nonValueReferences.get(resource);
+            // 资源有被引用则从 unusedResSet 里面移除
+            // 验证一下，如果 a 引用 b，a没有用到，b会被发现吗？
             unusedResSet.removeAll(childReference);
             for (String reference : childReference) {
                 if (!visitPath.contains(reference)) {
@@ -459,6 +510,7 @@ public class UnusedResourcesTask extends ApkTask {
             long startTime = System.currentTimeMillis();
             readMappingTxtFile();
             readResourceTxtFile();
+            // 将所有资源标记未使用
             unusedResSet.addAll(resourceDefMap.values());
             Log.i(TAG, "find resource declarations %d items.", unusedResSet.size());
             decodeCode();

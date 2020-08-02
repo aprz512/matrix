@@ -1,6 +1,5 @@
 {
-  "--apk": "D:\\Android\\AndroidStudioProjects\\AndResGuard\\AndResGuard-example\\app\\build\\outputs\\apk\\flavor1Blue\\debug\\AndResGuard_app-flavor1-blue-debug\\app-flavor1-blue-debug_7zip_aligned_signed.apk",
-  "--resMappingTxt": "D:\\Android\\AndroidStudioProjects\\AndResGuard\\AndResGuard-example\\app\\build\\outputs\\apk\\flavor1Blue\\debug\\AndResGuard_app-flavor1-blue-debug\\resource_mapping_app-flavor1-blue-debug.txt",
+  "--apk": "D:\\Android\\AndroidStudioProjects\\matrix\\matrix\\matrix-android\\resapk\\build\\outputs\\apk\\debug\\resapk-debug.apk",
   "--output": "D:\\",
   "--format": "mm.html,mm.json",
   "--formatConfig": [
@@ -57,12 +56,8 @@
       "name": "-duplicatedFile"
     },
     {
-      "name": "-checkMultiSTL",
-      "--toolnm": "/Users/jinqiuchen/Library/Android/sdk/ndk-bundle/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-nm"
-    },
-    {
       "name": "-unusedResources",
-      "--rTxt": "/Users/jinqiuchen/SampleApplication/app/build/intermediates/symbols/release/R.txt",
+      "--rTxt": "D:\\Android\\AndroidStudioProjects\\matrix\\matrix\\matrix-android\\resapk\\build\\intermediates\\symbols\\debug\\R.txt",
       "--ignoreResources": [
         "R.raw.*",
         "R.style.*",
@@ -71,16 +66,6 @@
         "R.id.*",
         "R.string.ignore_*"
       ]
-    },
-    {
-      "name": "-unusedAssets",
-      "--ignoreAssets": [
-        "*.so"
-      ]
-    },
-    {
-      "name": "-unstrippedSo",
-      "--toolnm": "/Users/jinqiuchen/Library/Android/sdk/ndk-bundle/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-nm"
     }
   ]
 }

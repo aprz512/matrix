@@ -1,4 +1,4 @@
-package com.example.sample;
+package com.example.resapk;
 
 import org.junit.Test;
 

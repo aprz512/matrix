@@ -34,7 +34,7 @@ public class Log {
 
     private static LogImp debugLog = new LogImp() {
 
-        private int level = LOG_LEVEL_INFO;
+        private int level = LOG_LEVEL_VERBOSE;
 
         @Override
         public void v(final String tag, final String msg, final Object... obj) {
@@ -97,6 +97,7 @@ public class Log {
 
     private static LogImp logImp = debugLog;
     private static int level = LOG_LEVEL_INFO;
+
     private Log() {
     }
 
@@ -109,18 +110,18 @@ public class Log {
     }
 
     public static void setLogLevel(String logLevel) {
-        if (logLevel.equals("v")) {
-            level = LOG_LEVEL_VERBOSE;
-        } else if (logLevel.equals("d")) {
-            level = LOG_LEVEL_DEBUG;
-        } else if (logLevel.equals("i")) {
-            level = LOG_LEVEL_INFO;
-        } else if (logLevel.equals("w")) {
-            level = LOG_LEVEL_WARN;
-        } else if (logLevel.equals("e")) {
-            level = LOG_LEVEL_ERROR;
-        }
-        getImpl().setLogLevel(level);
+//        if (logLevel.equals("v")) {
+//            level = LOG_LEVEL_VERBOSE;
+//        } else if (logLevel.equals("d")) {
+//            level = LOG_LEVEL_DEBUG;
+//        } else if (logLevel.equals("i")) {
+//            level = LOG_LEVEL_INFO;
+//        } else if (logLevel.equals("w")) {
+//            level = LOG_LEVEL_WARN;
+//        } else if (logLevel.equals("e")) {
+//            level = LOG_LEVEL_ERROR;
+//        }
+        getImpl().setLogLevel(LOG_LEVEL_VERBOSE);
     }
 
     public static void v(final String tag, final String msg, final Object... obj) {

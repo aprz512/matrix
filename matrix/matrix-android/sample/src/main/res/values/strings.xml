@@ -1,5 +1,0 @@
-<resources>
-<string name="app_name">Sample</string>
-<string name="unused_string">这是个无用的字符串</string>
-<string name="string_style"><b>man</b><i>go</i></string>
-</resources>

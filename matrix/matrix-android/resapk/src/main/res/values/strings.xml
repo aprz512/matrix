@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">ResApk</string>
+    <string name="app_name1">Re1111sApk2</string>
+    <string name="app_name2">@string/app_name4</string>
+    <string name="app_name3">Re1111sApk4</string>
+    <string name="app_name4">Re1111sApk5</string>
+</resources>
