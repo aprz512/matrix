@@ -28,6 +28,7 @@ import java.util.UUID;
  * Created by tangyinsheng on 2017/6/2.
  * <p>
  * This class is ported from LeakCanary.
+ * 管理 hprof 文件存放位置，命名的类
  */
 
 public class DumpStorageManager {
@@ -62,6 +63,7 @@ public class DumpStorageManager {
         final String hprofFileName = "dump_"
                 + Long.toHexString(uuid.getMostSignificantBits())
                 + Long.toHexString(uuid.getLeastSignificantBits()) + HPROF_EXT;
+        // 直接是在 getExternalCacheDir / getCacheDir 下存放 .hprof 文件
         return new File(storageDir, hprofFileName);
     }
 
@@ -72,12 +74,14 @@ public class DumpStorageManager {
                     storageDir.getAbsolutePath());
             return null;
         }
+        // 找 .hprof 文件
         final File[] hprofFiles = storageDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
                 return name.endsWith(HPROF_EXT);
             }
         });
+        // 文件数量过多，删除
         if (hprofFiles != null && hprofFiles.length > mMaxStoredHprofFileCount) {
             for (File file : hprofFiles) {
                 if (file.exists() && !file.delete()) {

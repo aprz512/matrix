@@ -231,14 +231,14 @@ public class ApkResourceDecoder {
         references.addAll(xmlDecoder.getResourceRefSet());
 //                Log.d("decodeResValues", "path = " + resValuesFile.getPath());
 //        if (resValuesFile.getPath().equals("values/strings.xml")) {
-            Log.d("decodeResValues", "s------------------------------");
-            Set<String> resourceRefSet = xmlDecoder.getResourceRefSet();
-            Iterator<String> iterator = resourceRefSet.iterator();
-            while (iterator.hasNext()) {
-                String next = iterator.next();
-                Log.d("decodeResValues", "next = " + next);
-            }
-            Log.d("decodeResValues", "e------------------------------");
+//            Log.d("decodeResValues", "s------------------------------");
+//            Set<String> resourceRefSet = xmlDecoder.getResourceRefSet();
+//            Iterator<String> iterator = resourceRefSet.iterator();
+//            while (iterator.hasNext()) {
+//                String next = iterator.next();
+//                Log.d("decodeResValues", "next = " + next);
+//            }
+//            Log.d("decodeResValues", "e------------------------------");
 //        }
 
     }

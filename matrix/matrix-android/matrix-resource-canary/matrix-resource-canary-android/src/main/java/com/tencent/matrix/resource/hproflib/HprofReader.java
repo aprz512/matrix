@@ -44,11 +44,14 @@ public class HprofReader {
     }
 
     private void acceptHeader(HprofVisitor hv) throws IOException {
+        // 文件的版本描述及版本号
         final String text = IOUtil.readNullTerminatedString(mStreamIn);
+        // ,ID标识的size
         final int idSize = IOUtil.readBEInt(mStreamIn);
         if (idSize <= 0 || idSize >= (Integer.MAX_VALUE >> 1)) {
             throw new IOException("bad idSize: " + idSize);
         }
+        // 写入时间戳。
         final long timestamp = IOUtil.readBELong(mStreamIn);
         mIdSize = idSize;
         hv.visitHeader(text, idSize, timestamp);
@@ -57,6 +60,7 @@ public class HprofReader {
     private void acceptRecord(HprofVisitor hv) throws IOException {
         try {
             while (true) {
+                // 这里的TAG，以及其他数据的 TAG 很重要。解析 Hprof 文件协议时，就是用 TAG 来区分的
                 final int tag = mStreamIn.read();
                 final int timestamp = IOUtil.readBEInt(mStreamIn);
                 final long length = IOUtil.readBEInt(mStreamIn) & 0x00000000FFFFFFFFL;
@@ -97,12 +101,15 @@ public class HprofReader {
     }
 
     private void acceptStringRecord(int timestamp, long length, HprofVisitor hv) throws IOException {
+        // 这个id暂时不太明白，字符串id？？？
         final ID id = IOUtil.readID(mStreamIn, mIdSize);
+        // 字符串内容
         final String text = IOUtil.readString(mStreamIn, length - mIdSize);
         hv.visitStringRecord(id, text, timestamp, length);
     }
 
     private void acceptLoadClassRecord(int timestamp, long length, HprofVisitor hv) throws IOException {
+        // 看起来，这些 id 都是相互关联的，就像数据库的关联id一样
         final int serialNumber = IOUtil.readBEInt(mStreamIn);
         final ID classObjectId = IOUtil.readID(mStreamIn, mIdSize);
         final int stackTraceSerial = IOUtil.readBEInt(mStreamIn);

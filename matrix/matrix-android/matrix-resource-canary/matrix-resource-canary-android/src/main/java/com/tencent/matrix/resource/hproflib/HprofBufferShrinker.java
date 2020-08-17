@@ -161,6 +161,9 @@ public class HprofBufferShrinker {
         }
     }
 
+    /**
+     * 看看裁剪了些啥
+     */
     public void shrink(File hprofIn, File hprofOut) throws IOException {
         FileInputStream is = null;
         OutputStream os = null;
@@ -168,6 +171,8 @@ public class HprofBufferShrinker {
             is = new FileInputStream(hprofIn);
             os = new BufferedOutputStream(new FileOutputStream(hprofOut));
             final HprofReader reader = new HprofReader(new BufferedInputStream(is));
+            // 这里是做了一个访问者模式，所以，不用太关心里面的东西，只需要知道 visitor 里面的做了什么即可
+            // 不了解 hprof 的结构。里面的代码没法看
             reader.accept(new HprofInfoCollectVisitor());
             // Reset.
             is.getChannel().position(0);
@@ -207,6 +212,14 @@ public class HprofBufferShrinker {
 
         @Override
         public void visitStringRecord(ID id, String text, int timestamp, long length) {
+            // 主要是处理了 Bitmap 与 String 这两个类
+
+            // Bitmap 有个 mBuffer 字段与 mRecycled 字段
+            // Bitmap在android sdk < 26之前（> 2.3），存儲像素的byte數組是放在Java層的，26之後是放在native層的。
+
+            // String 有个 value 字段
+            // String在android sdk < 23之前，存儲字符的byte數組是放在Java層的，23之後是放在native層的。
+
             if (mBitmapClassNameStringId == null && "android.graphics.Bitmap".equals(text)) {
                 mBitmapClassNameStringId = id;
             } else if (mMBufferFieldNameStringId == null && "mBuffer".equals(text)) {
@@ -257,6 +270,7 @@ public class HprofBufferShrinker {
                 @Override
                 public void visitHeapDumpInstance(ID id, int stackId, ID typeId, byte[] instanceData) {
                     try {
+                        // 找到Bitmap實例
                         if (mBmpClassId != null && mBmpClassId.equals(typeId)) {
                             ID bufferId = null;
                             Boolean isRecycled = null;
@@ -267,9 +281,12 @@ public class HprofBufferShrinker {
                                 if (fieldType == null) {
                                     throw new IllegalStateException("visit bmp instance failed, lost type def of typeId: " + field.typeId);
                                 }
+                                // 找到這個實例mBuffer字段的索引id
                                 if (mMBufferFieldNameStringId.equals(fieldNameStringId)) {
                                     bufferId = (ID) IOUtil.readValue(bais, fieldType, mIdSize);
-                                } else if (mMRecycledFieldNameStringId.equals(fieldNameStringId)) {
+                                }
+                                // 找到這個實例mRecycled的boolean值(基礎數據類型，沒有引用關係)
+                                else if (mMRecycledFieldNameStringId.equals(fieldNameStringId)) {
                                     isRecycled = (Boolean) IOUtil.readValue(bais, fieldType, mIdSize);
                                 } else if (bufferId == null || isRecycled == null) {
                                     IOUtil.skipValue(bais, fieldType, mIdSize);
@@ -278,11 +295,15 @@ public class HprofBufferShrinker {
                                 }
                             }
                             bais.close();
+                            // 確認Bitmap沒有被回收
                             final boolean reguardAsNotRecycledBmp = (isRecycled == null || !isRecycled);
                             if (bufferId != null && reguardAsNotRecycledBmp && !bufferId.equals(mNullBufferId)) {
+                                // 將mBuffer對應的byte數組索引id加入集合
                                 mBmpBufferIds.add(bufferId);
                             }
-                        } else if (mStringClassId != null && mStringClassId.equals(typeId)) {
+                        }
+                        // 如果是String類型
+                        else if (mStringClassId != null && mStringClassId.equals(typeId)) {
                             ID strValueId = null;
                             final ByteArrayInputStream bais = new ByteArrayInputStream(instanceData);
                             for (Field field : mStringClassInstanceFields) {
@@ -291,6 +312,7 @@ public class HprofBufferShrinker {
                                 if (fieldType == null) {
                                     throw new IllegalStateException("visit string instance failed, lost type def of typeId: " + field.typeId);
                                 }
+                                // 找到這個String實例的value字段對應的byte數組的索引id
                                 if (mValueFieldNameStringId.equals(fieldNameStringId)) {
                                     strValueId = (ID) IOUtil.readValue(bais, fieldType, mIdSize);
                                 } else if (strValueId == null) {
@@ -300,6 +322,7 @@ public class HprofBufferShrinker {
                                 }
                             }
                             bais.close();
+                            // 將value字段對應的byte數組索引id加入集合
                             if (strValueId != null && !strValueId.equals(mNullBufferId)) {
                                 mStringValueIds.add(strValueId);
                             }
@@ -311,6 +334,7 @@ public class HprofBufferShrinker {
 
                 @Override
                 public void visitHeapDumpPrimitiveArray(int tag, ID id, int stackId, int numElements, int typeId, byte[] elements) {
+                    // 將所有byte數組的索引id，以及對應byte[]數據加入集合
                     mBufferIdToElementDataMap.put(id, elements);
                 }
             };
@@ -332,6 +356,7 @@ public class HprofBufferShrinker {
                 if (mergedBufferId == null) {
                     duplicateBufferFilterMap.put(buffMd5, bufferId);
                 } else {
+                    // 若Bitmap存在重複的byte[]數據，所有引用都指向同一塊byte數組的索引(方便後續裁剪掉重複的byte[]數據)
                     mBmpBufferIdToDeduplicatedIdMap.put(mergedBufferId, mergedBufferId);
                     mBmpBufferIdToDeduplicatedIdMap.put(bufferId, mergedBufferId);
                 }
@@ -353,6 +378,8 @@ public class HprofBufferShrinker {
                 @Override
                 public void visitHeapDumpInstance(ID id, int stackId, ID typeId, byte[] instanceData) {
                     try {
+                        // 如果是 bitmap，且 mBuffer 的内容是有重复的（mBmpBufferIdToDeduplicatedIdMap 里面判断）
+                        // 将 mBuffer 字段的 id 指向唯一的那个 id，其他的就可以去除掉了
                         if (typeId.equals(mBmpClassId)) {
                             ID bufferId = null;
                             int bufferIdPos = 0;
@@ -363,6 +390,7 @@ public class HprofBufferShrinker {
                                 if (fieldType == null) {
                                     throw new IllegalStateException("visit instance failed, lost type def of typeId: " + field.typeId);
                                 }
+                                // mBuffer
                                 if (mMBufferFieldNameStringId.equals(fieldNameStringId)) {
                                     bufferId = (ID) IOUtil.readValue(bais, fieldType, mIdSize);
                                     break;
@@ -373,6 +401,7 @@ public class HprofBufferShrinker {
                             if (bufferId != null) {
                                 final ID deduplicatedId = mBmpBufferIdToDeduplicatedIdMap.get(bufferId);
                                 if (deduplicatedId != null && !bufferId.equals(deduplicatedId) && !bufferId.equals(mNullBufferId)) {
+                                    // 让重复的 buf 指向同一个
                                     modifyIdInBuffer(instanceData, bufferIdPos, deduplicatedId);
                                 }
                             }
@@ -391,10 +420,17 @@ public class HprofBufferShrinker {
 
                 @Override
                 public void visitHeapDumpPrimitiveArray(int tag, ID id, int stackId, int numElements, int typeId, byte[] elements) {
+                    // 重複的byte數組索引 重定向之後的 索引id
                     final ID deduplicatedID = mBmpBufferIdToDeduplicatedIdMap.get(id);
                     // Discard non-bitmap or duplicated bitmap buffer but keep reference key.
+                    // 将非 bitmap 数组也给裁了
                     if (deduplicatedID == null || !id.equals(deduplicatedID)) {
+                        // 这里判断了 string
+                        // 也就是说，Hprof文件裁剪的過程主要是裁剪了重複Bitmap的byte[]數據，String 是用来判断的
                         if (!mStringValueIds.contains(id)) {
+                            // 这里直接 return，没有调用 super 方法，
+                            // 即没有调用 `com.tencent.matrix.resource.hproflib.HprofWriter.HprofHeapDumpWriter.visitHeapDumpPrimitiveArray` 的方法，
+                            // 所以不会写入数组信息
                             return;
                         }
                     }

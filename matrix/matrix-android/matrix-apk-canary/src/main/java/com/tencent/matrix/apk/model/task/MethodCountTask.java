@@ -296,6 +296,9 @@ public class MethodCountTask extends ApkTask {
                 jsonArray.add(jsonObject);
             }
             ((TaskJsonResult) taskResult).add("dex-files", jsonArray);
+
+            System.out.println(jsonArray.toString());
+
             taskResult.setStartTime(startTime);
             taskResult.setEndTime(System.currentTimeMillis());
             return taskResult;

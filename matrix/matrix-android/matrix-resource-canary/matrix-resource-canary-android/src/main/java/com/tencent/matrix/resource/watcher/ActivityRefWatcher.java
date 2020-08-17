@@ -64,19 +64,19 @@ import static android.os.Build.VERSION.SDK_INT;
 public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppForeground {
     private static final String TAG = "Matrix.ActivityRefWatcher";
 
-    private static final int  CREATED_ACTIVITY_COUNT_THRESHOLD = 1;
-    private static final long FILE_CONFIG_EXPIRED_TIME         = 24 * 60 * 60 * 1000;
+    private static final int CREATED_ACTIVITY_COUNT_THRESHOLD = 1;
+    private static final long FILE_CONFIG_EXPIRED_TIME = 24 * 60 * 60 * 1000;
 
     private static final String ACTIVITY_REFKEY_PREFIX = "MATRIX_RESCANARY_REFKEY_";
 
     private final ResourcePlugin mResourcePlugin;
 
-    private final RetryableTaskExecutor             mDetectExecutor;
-    private final int                               mMaxRedetectTimes;
-    private final long                              mBgScanTimes;
-    private final long                              mFgScanTimes;
-    private final DumpStorageManager                mDumpStorageManager;
-    private final AndroidHeapDumper                 mHeapDumper;
+    private final RetryableTaskExecutor mDetectExecutor;
+    private final int mMaxRedetectTimes;
+    private final long mBgScanTimes;
+    private final long mFgScanTimes;
+    private final DumpStorageManager mDumpStorageManager;
+    private final AndroidHeapDumper mHeapDumper;
     private final AndroidHeapDumper.HeapDumpHandler mHeapDumpHandler;
     private final ResourceConfig.DumpMode mDumpHprofMode;
 
@@ -203,6 +203,9 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
         return mHeapDumper;
     }
 
+    /**
+     * 将 destory 的 activity 全部添加到 mDestroyedActivityInfos 中
+     */
     private void pushDestroyedActivityInfo(Activity activity) {
         final String activityName = activity.getClass().getName();
         if (!mResourcePlugin.getConfig().getDetectDebugger() && isPublished(activityName)) {
@@ -212,10 +215,10 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
         final UUID uuid = UUID.randomUUID();
         final StringBuilder keyBuilder = new StringBuilder();
         keyBuilder.append(ACTIVITY_REFKEY_PREFIX).append(activityName)
-            .append('_').append(Long.toHexString(uuid.getMostSignificantBits())).append(Long.toHexString(uuid.getLeastSignificantBits()));
+                .append('_').append(Long.toHexString(uuid.getMostSignificantBits())).append(Long.toHexString(uuid.getLeastSignificantBits()));
         final String key = keyBuilder.toString();
         final DestroyedActivityInfo destroyedActivityInfo
-            = new DestroyedActivityInfo(key, activity, activityName);
+                = new DestroyedActivityInfo(key, activity, activityName);
         mDestroyedActivityInfos.add(destroyedActivityInfo);
     }
 
@@ -238,12 +241,14 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
                 return Status.RETRY;
             }
 
+            // 如果没有开 mDetectDebugger，那么当我们调试的时候，就会将泄露检测延迟
             // Fake leaks will be generated when debugger is attached.
             if (Debug.isDebuggerConnected() && !mResourcePlugin.getConfig().getDetectDebugger()) {
                 MatrixLog.w(TAG, "debugger is connected, to avoid fake result, detection was delayed.");
                 return Status.RETRY;
             }
 
+            // 创建一个 weak 引用，触发 gc，看有没有被回收，触发 gc，系统不一定会叼你
             final WeakReference<Object> sentinelRef = new WeakReference<>(new Object());
             triggerGc();
             if (sentinelRef.get() != null) {
@@ -256,11 +261,13 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
 
             while (infoIt.hasNext()) {
                 final DestroyedActivityInfo destroyedActivityInfo = infoIt.next();
+                // 这个 activity 已经 publish 过了
                 if (!mResourcePlugin.getConfig().getDetectDebugger() && isPublished(destroyedActivityInfo.mActivityName) && mDumpHprofMode != ResourceConfig.DumpMode.SILENCE_DUMP) {
                     MatrixLog.v(TAG, "activity with key [%s] was already published.", destroyedActivityInfo.mActivityName);
                     infoIt.remove();
                     continue;
                 }
+                // activity 已经被回收了
                 if (destroyedActivityInfo.mActivityRef.get() == null) {
                     // The activity was recycled by a gc triggered outside.
                     MatrixLog.v(TAG, "activity with key [%s] was already recycled.", destroyedActivityInfo.mKey);
@@ -270,20 +277,23 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
 
                 ++destroyedActivityInfo.mDetectedCount;
 
+                // 泄露检测测试超过一定次数才认为是真的泄露了
                 if (destroyedActivityInfo.mDetectedCount < mMaxRedetectTimes
-                    || !mResourcePlugin.getConfig().getDetectDebugger()) {
+                        || !mResourcePlugin.getConfig().getDetectDebugger()) {
                     // Although the sentinel tell us the activity should have been recycled,
                     // system may still ignore it, so try again until we reach max retry times.
                     MatrixLog.i(TAG, "activity with key [%s] should be recycled but actually still \n"
-                            + "exists in %s times, wait for next detection to confirm.",
-                        destroyedActivityInfo.mKey, destroyedActivityInfo.mDetectedCount);
+                                    + "exists in %s times, wait for next detection to confirm.",
+                            destroyedActivityInfo.mKey, destroyedActivityInfo.mDetectedCount);
                     continue;
                 }
 
                 MatrixLog.i(TAG, "activity with key [%s] was suspected to be a leaked instance. mode[%s]", destroyedActivityInfo.mKey, mDumpHprofMode);
 
                 if (mDumpHprofMode == ResourceConfig.DumpMode.SILENCE_DUMP) {
-                    if (mResourcePlugin != null && !isPublished(destroyedActivityInfo.mActivityName)) {
+                    // 是 SILENCE_DUMP 模式，那么回调一下方法就好了：onDetectIssue onLeak
+                    // 这个模式没有调用 markPublished
+                    if (!isPublished(destroyedActivityInfo.mActivityName)) {
                         final JSONObject resultJson = new JSONObject();
                         try {
                             resultJson.put(SharePluginInfo.ISSUE_ACTIVITY_NAME, destroyedActivityInfo.mActivityName);
@@ -296,10 +306,13 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
                         activityLeakCallback.onLeak(destroyedActivityInfo.mActivityName, destroyedActivityInfo.mKey);
                     }
                 } else if (mDumpHprofMode == ResourceConfig.DumpMode.AUTO_DUMP) {
+                    // 如果是 AUTO_DUMP 模式，那么就去自动分析 heap 文件了，与 LeakCanary 类似
                     final File hprofFile = mHeapDumper.dumpHeap();
                     if (hprofFile != null) {
                         markPublished(destroyedActivityInfo.mActivityName);
+                        // dump hprof 文件
                         final HeapDump heapDump = new HeapDump(hprofFile, destroyedActivityInfo.mKey, destroyedActivityInfo.mActivityName);
+                        // 处理 dump 出来的 hprof 文件
                         mHeapDumpHandler.process(heapDump);
                         infoIt.remove();
                     } else {
@@ -308,6 +321,8 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
                         infoIt.remove();
                     }
                 } else if (mDumpHprofMode == ResourceConfig.DumpMode.MANUAL_DUMP) {
+                    // 如果是 MANUAL_DUMP 模式，就弹一个通知给开发者，点击通知打开一个界面，让开发者自己去分析，与 LeakCanary 类似
+                    // 默认是这个模式
                     NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
                     String dumpingHeapContent = context.getString(R.string.resource_canary_leak_tip);
                     String dumpingHeapTitle = destroyedActivityInfo.mActivityName;
@@ -326,6 +341,7 @@ public class ActivityRefWatcher extends FilePublisher implements Watcher, IAppFo
                     markPublished(destroyedActivityInfo.mActivityName);
                     MatrixLog.i(TAG, "show notification for notify activity leak. %s", destroyedActivityInfo.mActivityName);
                 } else {
+                    // 这里也是触发回调 onDetectIssue，与 SILENCE_DUMP 的不同，就是它调用了 markPublished
                     // Lightweight mode, just report leaked activity name.
                     MatrixLog.i(TAG, "lightweight mode, just report leaked activity name.");
                     markPublished(destroyedActivityInfo.mActivityName);

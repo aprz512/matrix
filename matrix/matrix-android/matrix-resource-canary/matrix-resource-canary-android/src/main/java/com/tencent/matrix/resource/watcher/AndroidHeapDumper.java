@@ -79,14 +79,16 @@ public class AndroidHeapDumper {
         }
 
         final FutureResult<Toast> waitingForToast = new FutureResult<>();
+        // 显示一个正在 dump hprof 文件的 toast
         showToast(waitingForToast);
-
+        // toast 没显示出来，主线程太忙了，放弃
         if (!waitingForToast.wait(5, TimeUnit.SECONDS)) {
             MatrixLog.w(TAG, "give up dumping heap, waiting for toast too long.");
             return null;
         }
 
         try {
+            // dump hprof 文件，取消 toast 展示
             Debug.dumpHprofData(hprofFile.getAbsolutePath());
             cancelToast(waitingForToast.get());
             return hprofFile;
@@ -106,6 +108,7 @@ public class AndroidHeapDumper {
                 LayoutInflater inflater = LayoutInflater.from(mContext);
                 toast.setView(inflater.inflate(R.layout.resource_canary_toast_wait_for_heapdump, null));
                 toast.show();
+                // 保证 toast 显示出来了
                 // Waiting for Idle to make sure Toast gets rendered.
                 Looper.myQueue().addIdleHandler(new MessageQueue.IdleHandler() {
                     @Override

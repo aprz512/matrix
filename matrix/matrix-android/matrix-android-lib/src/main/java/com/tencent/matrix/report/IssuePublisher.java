@@ -23,12 +23,18 @@ import java.util.HashSet;
  * Only one listener is accepted.
  *
  * @author liyongjie
- *         Created by liyongjie on 2017/6/6.
+ * Created by liyongjie on 2017/6/6.
  */
 
 public class IssuePublisher {
 
-    private final OnIssueDetectListener    mIssueListener;
+    /**
+     * 调用 publishIssue 方法会触发该回调
+     */
+    private final OnIssueDetectListener mIssueListener;
+    /**
+     * 用来标记 issue 是否已经 publish 了
+     */
     private final HashSet<String> mPublishedMap;
 
     public interface OnIssueDetectListener {

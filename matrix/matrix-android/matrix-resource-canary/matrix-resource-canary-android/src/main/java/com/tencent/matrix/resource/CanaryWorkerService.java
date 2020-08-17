@@ -43,7 +43,7 @@ import static com.tencent.matrix.resource.common.utils.StreamUtil.copyFileToStre
 
 /**
  * Created by tangyinsheng on 2017/7/11.
- *
+ *  使用了 JobIntentService，现在应该使用 WorkManager
  */
 public class CanaryWorkerService extends MatrixJobIntentService {
     private static final String TAG = "Matrix.CanaryWorkerService";
@@ -65,6 +65,8 @@ public class CanaryWorkerService extends MatrixJobIntentService {
             final String action = intent.getAction();
             if (ACTION_SHRINK_HPROF.equals(action)) {
                 try {
+                    // 这里设置了类加载器，为啥呢？
+                    // 不设置是默认的classloader，因该是一样的才对啊
                     intent.setExtrasClassLoader(this.getClassLoader());
                     final HeapDump heapDump = (HeapDump) intent.getSerializableExtra(EXTRA_PARAM_HEAPDUMP);
                     if (heapDump != null) {
@@ -79,6 +81,9 @@ public class CanaryWorkerService extends MatrixJobIntentService {
         }
     }
 
+    /**
+     * 裁剪 hprof 文件，上报
+     */
     private void doShrinkHprofAndReport(HeapDump heapDump) {
         final File hprofDir = heapDump.getHprofFile().getParentFile();
         final File shrinkedHProfFile = new File(hprofDir, getShrinkHprofName(heapDump.getHprofFile()));
@@ -87,15 +92,18 @@ public class CanaryWorkerService extends MatrixJobIntentService {
         ZipOutputStream zos = null;
         try {
             long startTime = System.currentTimeMillis();
+            // 进行裁剪工作
             new HprofBufferShrinker().shrink(hprofFile, shrinkedHProfFile);
             MatrixLog.i(TAG, "shrink hprof file %s, size: %dk to %s, size: %dk, use time:%d",
                     hprofFile.getPath(), hprofFile.length() / 1024, shrinkedHProfFile.getPath(), shrinkedHProfFile.length() / 1024, (System.currentTimeMillis() - startTime));
 
+            // 将裁剪后的文件压缩
             zos = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(zipResFile)));
 
             final ZipEntry resultInfoEntry = new ZipEntry("result.info");
             final ZipEntry shrinkedHProfEntry = new ZipEntry(shrinkedHProfFile.getName());
 
+            // 添加一个描述文件
             zos.putNextEntry(resultInfoEntry);
             final PrintWriter pw = new PrintWriter(new OutputStreamWriter(zos, Charset.forName("UTF-8")));
             pw.println("# Resource Canary Result Infomation. THIS FILE IS IMPORTANT FOR THE ANALYZER !!");
@@ -106,6 +114,7 @@ public class CanaryWorkerService extends MatrixJobIntentService {
             pw.flush();
             zos.closeEntry();
 
+            // 添加裁剪后的 hprof 文件
             zos.putNextEntry(shrinkedHProfEntry);
             copyFileToStream(shrinkedHProfFile, zos);
             zos.closeEntry();

@@ -4,4 +4,10 @@
     <string name="app_name2">@string/app_name4</string>
     <string name="app_name3">Re1111sApk4</string>
     <string name="app_name4">Re1111sApk5</string>
+
+
+    <string-array name="sarr">
+        <item>1</item>
+        <item>2</item>
+    </string-array>
 </resources>

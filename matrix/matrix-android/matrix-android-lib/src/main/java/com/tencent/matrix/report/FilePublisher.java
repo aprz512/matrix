@@ -26,15 +26,20 @@ import java.util.HashSet;
 
 /**
  * Created by zhangshaowen on 2017/8/1.
+ * 将需要 publish 的 issue 储存到 sp 中，mPublishedMap 也有一份，便于处理逻辑，与 sp 是同步的
  */
 
 public class FilePublisher extends IssuePublisher {
     private static final String TAG = "Matrix.FilePublisher";
 
-    private final long                     expiredTime;
-    private final SharedPreferences        sharedPreferences;
+    private final long expiredTime;
+    private final SharedPreferences sharedPreferences;
     private final SharedPreferences.Editor editor;
-    private final HashMap<String, Long>    mPublishedMap;
+    /**
+     * key： issue 的 key
+     * value： issue 标记发布的时间
+     */
+    private final HashMap<String, Long> mPublishedMap;
     protected final Context context;
 
 

@@ -98,6 +98,7 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
 
     void removeUnusedResources(String originalApk, String rTxtFile, SigningConfig signingConfig) {
         ZipOutputStream zipOutputStream = null;
+        // 读取 gradle 插件配置信息
         boolean needSign = project.extensions.matrix.removeUnusedResources.needSign;
         boolean shrinkArsc = project.extensions.matrix.removeUnusedResources.shrinkArsc;
         String apksigner = project.extensions.matrix.removeUnusedResources.apksignerPath;
@@ -120,19 +121,21 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                     // 配置的语法应该支持 * 啥的吧
                     ignoreResources.add(Util.globToRegexp(res));
                 }
-                // 加载配置的 未使用的资源，这个选项很迷
+                // 加载配置的 未使用的资源，这个就是 ApkChecker 分析出来的资源
                 Set<String> unusedResources = project.extensions.matrix.removeUnusedResources.unusedResources;
                 Iterator<String> iterator = unusedResources.iterator();
                 String res = null;
                 while (iterator.hasNext()) {
                     res = iterator.next();
                     if (ignoreResource(res)) {
+                        // 将需要忽略的资源从待删除集合中移除
                         iterator.remove();
                         Log.i(TAG, "ignore unused resources %s", res);
                     }
                 }
                 Log.i(TAG, "unused resources count:%d", unusedResources.size());
 
+                // 移除资源后重新打包（签名）的路径
                 String outputApk = inputFile.getParentFile().getAbsolutePath() + "/" + inputFile.getName().substring(0, inputFile.getName().indexOf('.')) + "_shrinked.apk";
 
                 File outputFile = new File(outputApk);
@@ -151,11 +154,11 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                 File resTxtFile = new File(rTxtFile);
                 readResourceTxtFile(resTxtFile, resourceMap, styleableMap);
 
-
+                // 需要移除的资源集合 -> removeResources
                 Map<String, Integer> removeResources = new HashMap<>();
                 for (String resName : unusedResources) {
                     if (!ignoreResource(resName)) {
-                        // 从 map 中移除，map 还要用于后面重写 R.txt 文件
+                        // 资源名称 -> 资源id
                         removeResources.put(resName, resourceMap.remove(resName));
                     }
                 }
@@ -184,8 +187,6 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
                             continue;
                         } else {
                             // shrinkArsc 需要精简 arsc 文件，这是大头
-                            // 看这里的逻辑，unusedResources 必须配置才能生效，但是我咋知道哪些文件是未使用的！！！
-                            // 看 demo 的配置，是使用命令自动生成的
                             if (shrinkArsc && zipEntry.name.equalsIgnoreCase("resources.arsc") && unusedResources.size() > 0) {
                                 File srcArscFile = new File(inputFile.getParentFile().getAbsolutePath() + "/resources.arsc");
                                 File destArscFile = new File(inputFile.getParentFile().getAbsolutePath() + "/resources_shrinked.arsc");
@@ -324,7 +325,7 @@ public class RemoveUnusedResourcesTask extends DefaultTask {
 
     /**
      * 将 R.txt 中的符号表内存读到map里面
-     * resourceMap 里面是 string id dimens 之类的东西
+     * resourceMap 里面是 string id dimens 之类的东西 --> int attr layout_editor_absoluteY 0x7f0200c5 -->  {"R.attr.layout_editor_absoluteY":"0x7f0200c5"}
      * styleableMap 里面是 styleable   --> {R.styleable.ViewBackgroundHelper: [{R.styleable.ViewBackgroundHelper_android_background,0x010100d4}, ...]}
      */
     private void readResourceTxtFile(File resTxtFile, Map<String, Integer> resourceMap, Map<String, Pair<String, Integer>[]> styleableMap) throws IOException {
