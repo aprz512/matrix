@@ -69,9 +69,11 @@ public class ActivityLeakAnalyzer implements HeapSnapshotAnalyzer<ActivityLeakRe
 
         try {
             final Snapshot snapshot = heapSnapshot.getSnapshot();
+            // 找到泄漏的对象
             final Instance leakingRef = findLeakingReference(refKey, snapshot);
 
             // False alarm, weak reference was cleared in between key check and heap dump.
+            // 误报
             if (leakingRef == null) {
                 return ActivityLeakResult.noLeak(AnalyzeUtil.since(analysisStartNanoTime));
             }
@@ -90,15 +92,21 @@ public class ActivityLeakAnalyzer implements HeapSnapshotAnalyzer<ActivityLeakRe
                     + DESTROYED_ACTIVITY_INFO_CLASSNAME);
         }
         List<String> keysFound = new ArrayList<>();
+        // 遍历 snapshot 中所有的 DestroyedActivityInfo 实例对象
         for (Instance infoInstance : infoClass.getInstancesList()) {
             final List<ClassInstance.FieldValue> values = classInstanceValues(infoInstance);
             final String keyCandidate = asString(fieldValue(values, ACTIVITY_REFERENCE_KEY_FIELDNAME));
+            // 如果key相等，说明是我们想要找的对象
             if (keyCandidate.equals(key)) {
                 final Instance weakRefObj = fieldValue(values, ACTIVITY_REFERENCE_FIELDNAME);
                 if (weakRefObj == null) {
                     continue;
                 }
+                // 获取弱引用对象的字段
                 final List<ClassInstance.FieldValue> activityRefs = classInstanceValues(weakRefObj);
+                // 返回 referent 字段，这个我就不太明白了
+                // 哦，因为 activityRefs 是弱引用对象的字段集合，所以看 Reference 的源码，
+                // 就知道它有个 referent 字段，指向的是引用的对象
                 return fieldValue(activityRefs, "referent");
             }
             keysFound.add(keyCandidate);

@@ -58,12 +58,16 @@ import static com.tencent.matrix.resource.analyzer.model.ReferenceTraceElement.T
 
 /**
  * This class is ported from LeakCanary.
- *
+ * <p>
  * Not thread safe.
- *
+ * <p>
  * Finds the shortest path from a reference to a gc root, ignoring excluded
  * refs first and then including the ones that are not "always ignorable" as needed if no path is
  * found.
+ *
+ * 这里的 shortest 是啥意思啊？
+ * gc root -> a -> b -> c -> d
+ * gc root -> a -> b -> a-> b -> c -> d  是这样的意思吗？
  */
 public final class ShortestPathFinder {
     private static final String ANONYMOUS_CLASS_NAME_PATTERN = "^.+\\$\\d+$";
@@ -99,6 +103,7 @@ public final class ShortestPathFinder {
             // We iterate from the leak to the GC root
             ReferenceNode node = new ReferenceNode(null,
                     null, referenceChainHead, null, null);
+            // 不断的从 泄漏的对象 向上遍历，直到 gcRoots
             while (node != null) {
                 ReferenceTraceElement element = buildReferenceTraceElement(node);
                 if (element != null) {
@@ -106,6 +111,7 @@ public final class ShortestPathFinder {
                 }
                 node = node.parent;
             }
+            // 就生成了一个引用链
             return new ReferenceChain(elements);
         }
 
@@ -114,6 +120,8 @@ public final class ShortestPathFinder {
                 // Ignore any root node.
                 return null;
             }
+
+            // 获取其 parent
             Instance holder = node.parent.instance;
 
             if (holder instanceof RootObj) {
@@ -129,6 +137,7 @@ public final class ShortestPathFinder {
 
             className = getClassName(holder);
 
+            // 获取 holder 的一些信息
             if (holder instanceof ClassObj) {
                 holderType = CLASS;
             } else if (holder instanceof ArrayInstance) {
@@ -237,8 +246,10 @@ public final class ShortestPathFinder {
         }
 
         clearState();
+        // 将 gcRoots 加入集合中，分为了两块，JAVA_LOCAL 与 其他
         enqueueGcRoots(snapshot);
 
+        // 默认是忽略 String 的，除非要找的泄漏对象是 String 类型的
         canIgnoreStrings = true;
         for (Instance targetReference : targetReferences) {
             if (isString(targetReference)) {
@@ -251,6 +262,7 @@ public final class ShortestPathFinder {
 
         while (!toVisitQueue.isEmpty() || !toVisitIfNoPathQueue.isEmpty()) {
             ReferenceNode node;
+            // 从集合中取出一个，先 toVisitQueue，后 toVisitIfNoPathQueue
             if (!toVisitQueue.isEmpty()) {
                 node = toVisitQueue.poll();
             } else {
@@ -260,6 +272,7 @@ public final class ShortestPathFinder {
                 }
             }
 
+            // 找到了，跳出循环
             // Termination
             if (targetRefSet.contains(node.instance)) {
                 results.put(node.instance, new Result(node, node.exclusion != null));
@@ -269,6 +282,7 @@ public final class ShortestPathFinder {
                 }
             }
 
+            // 该节点被 visit 过了，跳过，像图的广度遍历
             if (checkSeen(node)) {
                 continue;
             }
@@ -300,8 +314,13 @@ public final class ShortestPathFinder {
         for (RootObj rootObj : snapshot.getGCRoots()) {
             switch (rootObj.getRootType()) {
                 case JAVA_LOCAL:
+                    // 这个感觉像是局部变量
                     Instance thread = HahaSpy.allocatingThread(rootObj);
+                    // 拿到线程名字
                     String threadName = threadName(thread);
+                    // 如果线程在排除范围内，那么就不考虑
+                    // 比如 main 线程，主线程堆栈一直在变化，所以局部变量不太可能长时间保存引用。
+                    // 如果是真的泄漏，一定会有另外一条路径
                     Exclusion params = excludedRefs.threadNames.get(threadName);
                     if (params == null || !params.alwaysExclude) {
                         enqueue(params, null, rootObj, null, null);
@@ -331,6 +350,7 @@ public final class ShortestPathFinder {
                     // Input or output parameters in native code.
                 case NATIVE_STACK:
                 case JAVA_STATIC:
+                    // 其他情况，直接入队列
                     enqueue(null, null, rootObj, null, null);
                     break;
                 default:
@@ -343,6 +363,9 @@ public final class ShortestPathFinder {
         return !visitedSet.add(node.instance);
     }
 
+    /**
+     * 如果是  root，那么将它引用的对象入队
+     */
     private void visitRootObj(ReferenceNode node) {
         RootObj rootObj = (RootObj) node.instance;
         Instance child = rootObj.getReferredInstance();
@@ -355,6 +378,7 @@ public final class ShortestPathFinder {
             if (node.exclusion != null) {
                 exclusion = node.exclusion;
             }
+            // 将父节点替换为Thread(GCRoot)，
             ReferenceNode parent = new ReferenceNode(null, holder, null, null, null);
             enqueue(exclusion, parent, child, "<Java Local>", LOCAL);
         } else {
@@ -362,25 +386,46 @@ public final class ShortestPathFinder {
         }
     }
 
+    /**
+     * 如果是Class对象，那么需要将它的字段入队
+     */
     private void visitClassObj(ReferenceNode node) {
         ClassObj classObj = (ClassObj) node.instance;
         Map<String, Exclusion> ignoredStaticFields =
                 excludedRefs.staticFieldNameByClassName.get(classObj.getClassName());
+        // 遍历静态字段
         for (Map.Entry<Field, Object> entry : classObj.getStaticFieldValues().entrySet()) {
             Field field = entry.getKey();
+            // 不是 object（ref），就忽略
             if (field.getType() != Type.OBJECT) {
                 continue;
             }
+            /*
+            一个Instance的field大致有这些：
+            $staticOverhead 不知道是啥，猜测是静态类的大小？？？
+
+            参考：https://android.googlesource.com/platform/dalvik.git/+/android-4.2.2_r1/vm/hprof/HprofHeap.cpp
+            The static field-name for the synthetic object generated to account for class Static overhead.
+            #define STATIC_OVERHEAD_NAME    "$staticOverhead"
+
+            04-25 10:20:46.793 D/LeakCanary: * Class com.xiao.memoryleakexample.app.App
+            04-25 10:20:46.793 D/LeakCanary: |   static $staticOverhead = byte[24]@314667009 (0x12c17001)
+            04-25 10:20:46.793 D/LeakCanary: |   static sActivities = java.util.ArrayList@315492800 (0x12ce09c0)
+            04-25 10:20:46.793 D/LeakCanary: |   static serialVersionUID = -920324649544707127
+            04-25 10:20:46.793 D/LeakCanary: |   static $change = null
+             */
             String fieldName = field.getName();
             if ("$staticOverhead".equals(fieldName)) {
                 continue;
             }
             Instance child = (Instance) entry.getValue();
             boolean visit = true;
+            // 排除某些静态字段
             if (ignoredStaticFields != null) {
                 Exclusion params = ignoredStaticFields.get(fieldName);
                 if (params != null) {
                     visit = false;
+                    // 看了下AndroidExcludedRefs，现在的静态字段里面都没有设置alwaysExclude
                     if (!params.alwaysExclude) {
                         enqueue(params, node, child, fieldName, STATIC_FIELD);
                     }
@@ -392,11 +437,15 @@ public final class ShortestPathFinder {
         }
     }
 
+    /**
+     * 如果是普通对象，遍历该对象字段以及父类字段，然后入队
+     */
     private void visitClassInstance(ReferenceNode node) {
         ClassInstance classInstance = (ClassInstance) node.instance;
         Map<String, Exclusion> ignoredFields = new LinkedHashMap<>();
         ClassObj superClassObj = classInstance.getClassObj();
         Exclusion classExclusion = null;
+        // 遍历所有父类的字段，收集所有需要排除的字段
         while (superClassObj != null) {
             Exclusion params = excludedRefs.classNames.get(superClassObj.getClassName());
             if (params != null && (classExclusion == null || !classExclusion.alwaysExclude)) {
@@ -424,6 +473,7 @@ public final class ShortestPathFinder {
             Instance child = (Instance) fieldValue.getValue();
             String fieldName = field.getName();
             Exclusion params = ignoredFields.get(fieldName);
+            // class 上没有设置 alwaysExclude，但是 field 上设置了，就进行覆盖
             // If we found a field exclusion and it's stronger than a class exclusion
             if (params != null && (fieldExclusion == null || (params.alwaysExclude
                     && !fieldExclusion.alwaysExclude))) {
@@ -433,6 +483,9 @@ public final class ShortestPathFinder {
         }
     }
 
+    /**
+     * 如果是对象数组，就入队
+     */
     private void visitArrayInstance(ReferenceNode node) {
         ArrayInstance arrayInstance = (ArrayInstance) node.instance;
         Type arrayType = arrayInstance.getArrayType();
@@ -450,28 +503,35 @@ public final class ShortestPathFinder {
         if (child == null) {
             return;
         }
+        // 跳过 原始类型，及其包装类，以及他们的数组，因为他们不引用对象
         if (isPrimitiveOrWrapperArray(child) || isPrimitiveWrapper(child)) {
             return;
         }
+        // 已经在待访问集合中，跳过
         // Whether we want to visit now or later, we should skip if this is already to visit.
         if (toVisitSet.contains(child)) {
             return;
         }
+        // enqueueGcRoots的逻辑中，只有某些线程（main等）为 gcRoots 的时候，exclusion 才不为 null
         boolean visitNow = exclusion == null;
         if (!visitNow && toVisitIfNoPathSet.contains(child)) {
             return;
         }
+        // 设置了忽略 string，如果是 string 就跳过
         if (canIgnoreStrings && isString(child)) {
             return;
         }
+        // 已经访问过了
         if (visitedSet.contains(child)) {
             return;
         }
         ReferenceNode childNode = new ReferenceNode(exclusion, child, parent, referenceName, referenceType);
+        // 正常的 gcRoots
         if (visitNow) {
             toVisitSet.add(child);
             toVisitQueue.add(childNode);
         } else {
+            // 有可能需要排除的 gcRoots
             toVisitIfNoPathSet.add(child);
             toVisitIfNoPathQueue.add(childNode);
         }

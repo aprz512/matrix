@@ -47,6 +47,7 @@ import static com.tencent.matrix.resource.analyzer.utils.ShortestPathFinder.Resu
 
 /**
  * Created by tangyinsheng on 2017/6/6.
+ * 分析内存中重复的 bitmap
  */
 
 public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<DuplicatedBitmapResult> {
@@ -86,27 +87,44 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
 
         final List<Instance> reachableInstances = new ArrayList<>();
         for (Heap heap : snapshot.getHeaps()) {
+            /*
+            heap 分为如下几个：
+            default heap：当系统未指定堆时。
+            image heap：系统启动映像，包含启动期间预加载的类。此处的分配保证绝不会移动或消失。
+            zygote heap：写时复制堆，其中的应用进程是从 Android 系统中派生的。
+            app heap：您的应用在其中分配内存的主堆。
+            JNI heap：显示 Java 原生接口 (JNI) 引用被分配和释放到什么位置的堆。
+
+            参考文档：https://developer.android.com/studio/profile/memory-profiler?hl=zh-cn
+             */
             if (!"default".equals(heap.getName()) && !"app".equals(heap.getName())) {
                 continue;
             }
 
+            // 获取 heap 中的 bitmap 实例
             final List<Instance> bitmapInstances = bitmapClass.getHeapInstances(heap.getId());
             for (Instance bitmapInstance : bitmapInstances) {
+                // 默认值是 Integer.MAX_VALUE，说明没有到 gc roots 的路径
                 if (bitmapInstance.getDistanceToGcRoot() == Integer.MAX_VALUE) {
                     continue;
                 }
                 reachableInstances.add(bitmapInstance);
             }
+            // 遍历那些可以到达 gc roots 的实例
             for (Instance bitmapInstance : reachableInstances) {
+                // 获取 bitmap 的 mBuffer 字段
                 ArrayInstance buffer = HahaHelper.fieldValue(((ClassInstance) bitmapInstance).getValues(), "mBuffer");
                 if (buffer != null) {
                     // sizeof(byte) * bufferLength -> bufferSize
                     final int bufferSize = buffer.getSize();
+                    // 大小小于阈值，跳过
                     if (bufferSize < mMinBmpLeakSize) {
                         // Ignore tiny bmp leaks.
                         System.out.println(" + Skiped a bitmap with size: " + bufferSize);
                         continue;
                     }
+                    // 为了避免 key 重复，就将 buffer clone 一份
+                    // 什么情况下 bitmap 会使用同一个 buffer
                     if (byteArrayToBitmapMap.containsKey(buffer)) {
                         buffer = cloneArrayInstance(buffer);
                     }
@@ -134,13 +152,25 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
             cachedValues.put(instance, instance.getValues());
         }
 
+        // 这里面一长段都是校验 mBuffer 是否相等的算法
+        // 更纯粹的逻辑可以看这里：
+        //https://android.googlesource.com/platform/tools/base/+/studio-master-dev/perflib/src/main/java/com/android/tools/perflib/heap/memoryanalyzer/DuplicatedBitmapAnalyzerTask.java
+        //
         int columnIndex = 0;
         while (!commonPrefixSets.isEmpty()) {
             for (Set<ArrayInstance> commonPrefixArrays : commonPrefixSets) {
                 Map<Object, Set<ArrayInstance>> entryClassifier = new HashMap<>(
                         commonPrefixArrays.size());
 
+                // 将所有 mBuffer，按照 mBuffer[columnIndex] 的值进行分组
+                // columnIndex 会递增
+                // columnIndex = 0，就是按照 mBuffer[0] 的值将所有的 mBuffer 进行分组
+                // 最外层的 while 循环再次进入时，commonPrefixArrays 就是按照 mBuffer[0] 分组好了的
+                // 然后 columnIndex = 1，将 commonPrefixArrays 里面的 set 再细分，按照 mBuffer[1] 分组
+
+                // arrayInstance 是 mBuffer
                 for (ArrayInstance arrayInstance : commonPrefixArrays) {
+                    // mBuffer 里面的第 columnIndex 个元素
                     final Object element = cachedValues.get(arrayInstance)[columnIndex];
                     if (entryClassifier.containsKey(element)) {
                         entryClassifier.get(element).add(arrayInstance);
@@ -165,8 +195,12 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
                             terminatedArrays.add(instance);
                         }
                     }
+                    // 移除已经遍历完成的 mBuffer
                     branch.removeAll(terminatedArrays);
 
+                    // 遍历 terminatedArrays，里面都是已经遍历完成的 mBuffer
+                    // 由于已经按照像素分组了，所以如果 size > 1，就说明是有重复的 mBuffer
+                    // 这个算法还挺复杂了，直接计算 mBuffer 的 md5/hash 也行啊
                     // Exact duplicated arrays found.
                     if (terminatedArrays.size() > 1) {
                         byte[] rawBuffer = null;
@@ -185,6 +219,7 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
                             }
                         }
 
+                        // 找到引用链
                         final Map<Instance, Result> results = new ShortestPathFinder(mExcludedBmps)
                                 .findPath(snapshot, duplicateBitmaps);
                         final List<ReferenceChain> referenceChains = new ArrayList<>();
@@ -192,6 +227,7 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
                             if (result.excludingKnown) {
                                 continue;
                             }
+                            // 这里是往上寻找，直到 gcRoots，用于获取一些信息，为啥不直接使用 buildReferenceChain
                             ReferenceNode currRefChainNode = result.referenceChainHead;
                             while (currRefChainNode.parent != null) {
                                 final ReferenceNode tempNode = currRefChainNode.parent;
@@ -212,6 +248,7 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
                             }
                             final String holderClassName = ((ClassObj) gcRootHolder).getClassName();
                             boolean isExcluded = false;
+                            // 排除满足 AndroidExcludedBmpRefs 中设定好的规则的引用
                             for (ExcludedBmps.PatternInfo patternInfo : mExcludedBmps.mClassNamePatterns) {
                                 if (!patternInfo.mForGCRootOnly) {
                                     continue;
@@ -224,6 +261,7 @@ public class DuplicatedBitmapAnalyzer implements HeapSnapshotAnalyzer<Duplicated
                                 }
                             }
                             if (!isExcluded) {
+                                // build 引用链
                                 referenceChains.add(result.buildReferenceChain());
                             }
                         }

@@ -122,6 +122,9 @@ public final class HahaHelper {
         }
     }
 
+    /**
+     * 是否为原始类型的包装类
+     */
     public static boolean isPrimitiveWrapper(Object value) {
         if (!(value instanceof ClassInstance)) {
             return false;
@@ -129,6 +132,9 @@ public final class HahaHelper {
         return WRAPPER_TYPES.contains(((ClassInstance) value).getClassObj().getClassName());
     }
 
+    /**
+     * 是否为原始类型或其包装类型的数组
+     */
     public static boolean isPrimitiveOrWrapperArray(Object value) {
         if (!(value instanceof ArrayInstance)) {
             return false;

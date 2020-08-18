@@ -199,6 +199,7 @@ public final class CLIMain {
         BufferedReader br = null;
         File tempHprofFile = null;
         try {
+            // 分析的是压缩文件，看起来是auto模式下裁剪的 hprof 文件
             zf = new ZipFile(mInputFile);
             final ZipEntry canaryResultInfoEntry = new ZipEntry("result.info");
             final Map<String, String> resultInfoMap = new HashMap<>();
@@ -219,6 +220,13 @@ public final class CLIMain {
                 resultInfoMap.put(key, value);
             }
 
+
+            /*
+            pw.println("sdkVersion=" + Build.VERSION.SDK_INT);
+            pw.println("manufacturer=" + Build.MANUFACTURER);
+            pw.println("hprofEntry=" + shrinkedHProfEntry.getName());
+            pw.println("leakedActivityKey=" + heapDump.getReferenceKey());
+             */
             final String sdkVersionStr = resultInfoMap.get("sdkVersion");
             if (sdkVersionStr == null) {
                 throw new IllegalStateException("sdkVersion is absent in result.info.");
@@ -241,6 +249,7 @@ public final class CLIMain {
                 throw new IllegalStateException("leakedActivityKey is absent in result.info.");
             }
 
+            // 将裁剪后的 hprof copy 到一个临时文件
             // We would extract hprof entry into a temporary file.
             tempHprofFile = new File(new File("").getAbsoluteFile(), "temp_" + System.currentTimeMillis() + ".hprof");
             StreamUtil.extractZipEntry(zf, hprofEntry, tempHprofFile);
@@ -286,13 +295,19 @@ public final class CLIMain {
     private static void analyzeAndStoreResult(File hprofFile, int sdkVersion, String manufacturer,
                                               String leakedActivityKey, JSONObject extraInfo) throws IOException {
         final HeapSnapshot heapSnapshot = new HeapSnapshot(hprofFile);
+        // 添加需要排除的引用，主要是由Android的SDK引起的，在AndroidExcludedRefs这个类中
         final ExcludedRefs excludedRefs = AndroidExcludedRefs.createAppDefaults(sdkVersion, manufacturer).build();
+        // 拿到泄漏的分析结果，根据 leakedActivityKey 找到了对象，就说明泄漏了，则返回引用链
+        // 没有找到对象（或者排除了），则返回 com.tencent.matrix.resource.analyzer.model.ActivityLeakResult.noLeak
         final ActivityLeakResult activityLeakResult
                 = new ActivityLeakAnalyzer(leakedActivityKey, excludedRefs).analyze(heapSnapshot);
 
+        // 进行重复图片的分析
         DuplicatedBitmapResult duplicatedBmpResult = DuplicatedBitmapResult.noDuplicatedBitmap(0);
         if (sdkVersion < 26) {
+            // 在 26 以下，bitmap 的 buffer 在 java 堆中
             final ExcludedBmps excludedBmps = AndroidExcludedBmpRefs.createDefaults().build();
+            // 拿到分析出来的结果
             duplicatedBmpResult = new DuplicatedBitmapAnalyzer(mMinBmpLeakSize, excludedBmps).analyze(heapSnapshot);
         } else {
             System.err.println("\n ! SDK version of target device is larger or equal to 26, "
@@ -332,6 +347,7 @@ public final class CLIMain {
                     }
                 }
 
+                // 使用 bitmap 的 buffer 还原成图片
                 // Store bitmap buffer.
                 final List<DuplicatedBitmapEntry> duplicatedBmpEntries = duplicatedBmpResult.getDuplicatedBitmapEntries();
                 final int duplicatedBmpEntryCount = duplicatedBmpEntries.size();

@@ -36,6 +36,7 @@ public final class AnalyzeUtil {
      */
     public static void deduplicateGcRoots(Snapshot snapshot) {
         // THashMap has a smaller memory footprint than HashMap.
+        // 简单的看了一下，THashMap 没有 entry，内存方面会好些
         final THashMap<String, RootObj> uniqueRootMap = new THashMap<>();
 
         final Collection<RootObj> gcRoots = snapshot.getGCRoots();
@@ -46,6 +47,7 @@ public final class AnalyzeUtil {
             }
         }
 
+        // 将 snapshot 里面的 gcRoots 去重
         // Repopulate snapshot with unique GC roots.
         gcRoots.clear();
         uniqueRootMap.forEach(new TObjectProcedure<String>() {
