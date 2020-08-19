@@ -314,7 +314,7 @@ public final class ShortestPathFinder {
         for (RootObj rootObj : snapshot.getGCRoots()) {
             switch (rootObj.getRootType()) {
                 case JAVA_LOCAL:
-                    // 这个感觉像是局部变量
+                    // Java棧幀中的局部變量
                     Instance thread = HahaSpy.allocatingThread(rootObj);
                     // 拿到线程名字
                     String threadName = threadName(thread);
@@ -387,7 +387,7 @@ public final class ShortestPathFinder {
     }
 
     /**
-     * 如果是Class对象，那么需要将它的字段入队
+     * 如果是Class对象，那么需要将它的静态字段入队
      */
     private void visitClassObj(ReferenceNode node) {
         ClassObj classObj = (ClassObj) node.instance;
@@ -484,7 +484,7 @@ public final class ShortestPathFinder {
     }
 
     /**
-     * 如果是对象数组，就入队
+     * 如果是对象数组，就将元素入队
      */
     private void visitArrayInstance(ReferenceNode node) {
         ArrayInstance arrayInstance = (ArrayInstance) node.instance;
@@ -526,6 +526,9 @@ public final class ShortestPathFinder {
             return;
         }
         ReferenceNode childNode = new ReferenceNode(exclusion, child, parent, referenceName, referenceType);
+        // 这里为毛要搞这么多集合啊
+        // 将有 exclusion 与没有 exclusion 的分开，我可以理解，为啥搞了 queue，还要搞个 set
+        // 是因为 contains 判断会快些吗？
         // 正常的 gcRoots
         if (visitNow) {
             toVisitSet.add(child);

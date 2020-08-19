@@ -23,6 +23,7 @@ import java.util.Set;
 
 /**
  * 主要是监测 APP 前后台
+ * 单例模式
  */
 public enum AppActiveMatrixDelegate {
 
