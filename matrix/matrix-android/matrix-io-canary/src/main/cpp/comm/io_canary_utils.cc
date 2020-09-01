@@ -76,6 +76,9 @@ namespace iocanary {
     }
 
     intmax_t GetMainThreadId() {
+        // 因为是 static的，无论该方法调用多少次，这行代码只会执行一次
+        // getpid 不是进程id吗
+        // 测试了一下，确实是相等的
         static intmax_t pid = getpid();
         return pid;
     }

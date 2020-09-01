@@ -34,9 +34,11 @@ namespace iocanary {
 
         if (GetMainThreadId() == file_io_info.java_context_.thread_id_) {
             int type = 0;
+            // 最大读写时间超过 13ms
             if (file_io_info.max_once_rw_cost_time_μs_ > IOCanaryEnv::kPossibleNegativeThreshold) {
                 type = 1;
             }
+            // 一次连续读写时间超过 500ms
             if(file_io_info.max_continual_rw_cost_time_μs_ > env.GetMainThreadThreshold()) {
                 type |= 2;
             }

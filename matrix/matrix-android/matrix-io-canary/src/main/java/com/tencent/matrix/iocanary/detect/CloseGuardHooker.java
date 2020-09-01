@@ -73,6 +73,10 @@ public final class CloseGuardHooker {
      */
     private boolean tryHook() {
         try {
+            // hook 系统的 CloseGuard 类，该类是用于监测某些类是否正常关闭的，比如 cursor
+            // 具体是先看一下 android.view.InputQueue 的源码就好了，几十行
+            // 大致原理就是依赖 finalize 方法来监测是否有调用对应的  close 方法
+            // 所以，我们使用反射开启这个类的功能，然后 hook 它，在里面做我们的逻辑
             Class<?> closeGuardCls = Class.forName("dalvik.system.CloseGuard");
             Class<?> closeGuardReporterCls = Class.forName("dalvik.system.CloseGuard$Reporter");
             Method methodGetReporter = closeGuardCls.getDeclaredMethod("getReporter");
@@ -93,6 +97,7 @@ public final class CloseGuardHooker {
 
             methodSetReporter.invoke(null, Proxy.newProxyInstance(classLoader,
                 new Class<?>[]{closeGuardReporterCls},
+                    // hook 类
                 new IOCloseLeakDetector(issueListener, sOriginalReporter)));
 
             return true;

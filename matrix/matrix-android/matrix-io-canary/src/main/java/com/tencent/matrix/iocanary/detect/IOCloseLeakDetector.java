@@ -61,6 +61,7 @@ public class IOCloseLeakDetector extends IssuePublisher implements InvocationHan
             if (isPublished(stackKey)) {
                 MatrixLog.d(TAG, "close leak issue already published; key:%s", stackKey);
             } else {
+                // 这里处理 issue
                 Issue ioIssue = new Issue(SharePluginInfo.IssueType.ISSUE_IO_CLOSABLE_LEAK);
                 ioIssue.setKey(stackKey);
                 JSONObject content = new JSONObject();

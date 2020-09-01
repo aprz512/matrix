@@ -100,6 +100,9 @@ import com.tencent.matrix.util.MatrixLog;
  * resource acquisition.
  *
  * @hide
+ *
+ * copy 的 android.media.CloseGuard 类
+ * 作用应该是暴露给开发者使用的，但是需要使用 finalize 方法，不建议使用
  */
 @SuppressWarnings("PMD")
 public final class MatrixCloseGuard {

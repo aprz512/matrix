@@ -32,6 +32,7 @@ namespace iocanary {
         return MD5(file_io_info.path_ + ":" + GetLatestStack(file_io_info.java_context_.stack_, 4));
     }
 
+    // 将 target 添加到集合，然后标记一下
     void FileIODetector::PublishIssue(const Issue &target, std::vector<Issue>& issues) {
         if (IsIssuePublished(target.key_)) {
             return;

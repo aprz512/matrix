@@ -39,6 +39,7 @@ public class IOCanaryJniBridge {
             return;
         }
 
+        // 加载 .so 文件
         //load lib
         if (!loadJni()) {
             MatrixLog.e(TAG, "install loadJni failed");
@@ -52,6 +53,7 @@ public class IOCanaryJniBridge {
             //set config
             if (config != null) {
                 if (config.isDetectFileIOInMainThread()) {
+                    // 调用 native 方法
                     enableDetector(DetectorType.MAIN_THREAD_IO);
                     // ms to μs
                     setConfig(ConfigKey.MAIN_THREAD_THRESHOLD, config.getFileMainThreadTriggerThreshold() * 1000L);

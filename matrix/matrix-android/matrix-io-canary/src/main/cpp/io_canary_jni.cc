@@ -100,16 +100,23 @@ namespace iocanary {
             return ret;
         }
 
+        // 处理 issue
         void OnIssuePublish(const std::vector<Issue>& published_issues) {
             if (!kInitSuc) {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "OnIssuePublish kInitSuc false");
                 return;
             }
 
+            // 测试过：这里的 env 有值，但是main线程没有
             JNIEnv* env;
             bool attached = false;
+            // 在线程里面，获取 env 的值，需要调用 AttachCurrentThread 才行
+            // 这里方法执行后， env 的值是 0
             jint j_ret = kJvm->GetEnv((void**)&env, JNI_VERSION_1_6);
             if (j_ret == JNI_EDETACHED) {
+                // 你的native代码建立自己的线程（比如建立线程监听），并在合适的时候回调 Java 代码，
+                // 我们没有办法直接获得 JNIEnv，获取它的实例需要把你的线程 Attach到JavaVM上去，
+                // 调用的方法是 JavaVM::AttachCurrentThread
                 jint jAttachRet = kJvm->AttachCurrentThread(&env, nullptr);
                 if (jAttachRet != JNI_OK) {
                     __android_log_print(ANDROID_LOG_ERROR, kTag, "onIssuePublish AttachCurrentThread !JNI_OK");
@@ -121,15 +128,21 @@ namespace iocanary {
                 return;
             }
 
+            // 检查有没有异常发生
+            // 这里就不是很懂了，这个检查的范围是多大啊
+            // 是整个线程？？？
             jthrowable exp = env->ExceptionOccurred();
             if (exp != NULL) {
                 __android_log_print(ANDROID_LOG_INFO, kTag, "checkCanCallbackToJava ExceptionOccurred, return false");
+                // 调用ExceptionDescribe输出了一段描述性信息
                 env->ExceptionDescribe();
                 return;
             }
 
+            // 创建 ArrayList
             jobject j_issues = env->NewObject(kListClass, kMethodIDListConstruct);
 
+            // 构建 IOIssue 对象
             for (const auto& issue : published_issues) {
                 jint type = issue.type_;
                 jstring path = env->NewStringUTF(issue.file_io_info_.path_.c_str());
@@ -146,6 +159,7 @@ namespace iocanary {
                 jobject issue_obj = env->NewObject(kIssueClass, kMethodIDIssueConstruct, type, path, file_size, op_cnt, buffer_size,
                                                    op_cost_time, op_type, op_size, thread_name, stack, repeat_read_cnt);
 
+                // 调用 add 方法
                 env->CallBooleanMethod(j_issues, kMethodIDListAdd, issue_obj);
 
                 env->DeleteLocalRef(issue_obj);
@@ -154,11 +168,13 @@ namespace iocanary {
                 env->DeleteLocalRef(path);
             }
 
+            // 调用 com.tencent.matrix.iocanary.core.IOCanaryJniBridge.onIssuePublish 方法
             env->CallStaticVoidMethod(kJavaBridgeClass, kMethodIDOnIssuePublish, j_issues);
 
             env->DeleteLocalRef(j_issues);
 
             if (attached) {
+                // detach 之前 attach 的线程
                 kJvm->DetachCurrentThread();
             }
         }
@@ -169,16 +185,20 @@ namespace iocanary {
             if (env == NULL || !kInitSuc) {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "ProxyOpen env null or kInitSuc:%d", kInitSuc);
             } else {
+                // 获取 java 层的 JavaContext 对象
                 jobject java_context_obj = env->CallStaticObjectMethod(kJavaBridgeClass, kMethodIDGetJavaContext);
                 if (NULL == java_context_obj) {
                     return;
                 }
 
+                // 获取java层堆栈信息
                 jstring j_stack = (jstring) env->GetObjectField(java_context_obj, kFieldIDStack);
+                // 线程名
                 jstring j_thread_name = (jstring) env->GetObjectField(java_context_obj, kFieldIDThreadName);
 
                 char* thread_name = jstringToChars(env, j_thread_name);
                 char* stack = jstringToChars(env, j_stack);
+                // 创建 C++ 层的 JavaContex 对象
                 JavaContext java_context(GetCurrentThreadId(), thread_name == NULL ? "" : thread_name, stack == NULL ? "" : stack);
                 free(stack);
                 free(thread_name);
@@ -317,8 +337,10 @@ namespace iocanary {
             return ret;
         }
 
+        // 这里JNIEXPORT和JNICALL都是JNI的关键字，表示此函数是要被JNI调用的。
         JNIEXPORT void JNICALL
         Java_com_tencent_matrix_iocanary_core_IOCanaryJniBridge_enableDetector(JNIEnv *env, jclass type, jint detector_type) {
+            // int 与 enum 的转换，吊
             iocanary::IOCanary::Get().RegisterDetector(static_cast<DetectorType>(detector_type));
         }
 
@@ -341,13 +363,17 @@ namespace iocanary {
                     continue;
                 }
 
+                // 从 .so 里面 找到 open 函数，将open函数的地址指向 ProxyOpen，原来的函数地址保存到 original_open
+                // void** 相当于一个泛型
                 xhook_hook_symbol(soinfo, "open", (void*)ProxyOpen, (void**)&original_open);
                 xhook_hook_symbol(soinfo, "open64", (void*)ProxyOpen64, (void**)&original_open64);
 
                 bool is_libjavacore = (strstr(so_name, "libjavacore.so") != nullptr);
+                // hook libjavacore.so 中的，read 与 write 方法，如果失败了，就 hook __read_chk 与 __write_chk
                 if (is_libjavacore) {
                     if (xhook_hook_symbol(soinfo, "read", (void*)ProxyRead, (void**)&original_read) != 0) {
                         __android_log_print(ANDROID_LOG_WARN, kTag, "doHook hook read failed, try __read_chk");
+                        // 不同版本的 Android 系统实现有所不同，在 Android 7.0 之后，我们还需要替换下面这三个方法。
                         if (xhook_hook_symbol(soinfo, "__read_chk", (void*)ProxyReadChk, (void**)&original_read_chk) != 0) {
                             __android_log_print(ANDROID_LOG_WARN, kTag, "doHook hook failed: __read_chk");
                             xhook_elf_close(soinfo);
@@ -365,6 +391,7 @@ namespace iocanary {
                     }
                 }
 
+                // hook close 方法
                 xhook_hook_symbol(soinfo, "close", (void*)ProxyClose, (void**)&original_close);
 
                 xhook_elf_close(soinfo);
@@ -396,6 +423,9 @@ namespace iocanary {
             return JNI_TRUE;
         }
 
+        /*
+         * 该方法里面主要是获取 一些 java class 及其字段
+         */
         static bool InitJniEnv(JavaVM *vm) {
             kJvm = vm;
             JNIEnv* env = NULL;
@@ -409,6 +439,7 @@ namespace iocanary {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "InitJniEnv kJavaBridgeClass NULL");
                 return false;
             }
+            // 临时引用转全局引用，是 IOCanaryJniBridge 的 class 对象
             kJavaBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(temp_cls));
 
             jclass temp_java_context_cls = env->FindClass("com/tencent/matrix/iocanary/core/IOCanaryJniBridge$JavaContext");
@@ -416,14 +447,18 @@ namespace iocanary {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "InitJniEnv kJavaBridgeClass NULL");
                 return false;
             }
+            // IOCanaryJniBridge$JavaContext
             kJavaContextClass = reinterpret_cast<jclass>(env->NewGlobalRef(temp_java_context_cls));
+            // IOCanaryJniBridge$JavaContext # stack
             kFieldIDStack = env->GetFieldID(kJavaContextClass, "stack", "Ljava/lang/String;");
+            // IOCanaryJniBridge$JavaContext # threadName
             kFieldIDThreadName = env->GetFieldID(kJavaContextClass, "threadName", "Ljava/lang/String;");
             if (kFieldIDStack == NULL || kFieldIDThreadName == NULL) {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "InitJniEnv kJavaContextClass field NULL");
                 return false;
             }
 
+            // IOCanaryJniBridge # onIssuePublish
             kMethodIDOnIssuePublish = env->GetStaticMethodID(kJavaBridgeClass, "onIssuePublish", "(Ljava/util/ArrayList;)V");
             if (kMethodIDOnIssuePublish == NULL) {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "InitJniEnv kMethodIDOnIssuePublish NULL");
@@ -441,8 +476,10 @@ namespace iocanary {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "InitJniEnv kIssueClass NULL");
                 return false;
             }
+            // IOIssue
             kIssueClass = reinterpret_cast<jclass>(env->NewGlobalRef(temp_issue_cls));
 
+            // IOIssue # <init>
             kMethodIDIssueConstruct = env->GetMethodID(kIssueClass, "<init>", "(ILjava/lang/String;JIJJIJLjava/lang/String;Ljava/lang/String;I)V");
             if (kMethodIDIssueConstruct == NULL) {
                 __android_log_print(ANDROID_LOG_ERROR, kTag, "InitJniEnv kMethodIDIssueConstruct NULL");
@@ -450,8 +487,11 @@ namespace iocanary {
             }
 
             jclass list_cls = env->FindClass("java/util/ArrayList");
+            // ArrayList
             kListClass = reinterpret_cast<jclass>(env->NewGlobalRef(list_cls));
+            // ArrayList # <init>
             kMethodIDListConstruct = env->GetMethodID(list_cls, "<init>", "()V");
+            // ArrayList # add
             kMethodIDListAdd = env->GetMethodID(list_cls, "add", "(Ljava/lang/Object;)Z");
 
             return true;
