@@ -59,7 +59,7 @@ public class AndroidHeapDumper {
         mMainHandler = mainHandler;
     }
 
-    public File dumpHeap() {
+    public File dumpHeap(boolean isShowToast) {
         final File hprofFile = mDumpStorageManager.newHprofFile();
 
         if (null == hprofFile) {
@@ -78,23 +78,32 @@ public class AndroidHeapDumper {
             return null;
         }
 
-        final FutureResult<Toast> waitingForToast = new FutureResult<>();
-        // 显示一个正在 dump hprof 文件的 toast
-        showToast(waitingForToast);
-        // toast 没显示出来，主线程太忙了，放弃
-        if (!waitingForToast.wait(5, TimeUnit.SECONDS)) {
-            MatrixLog.w(TAG, "give up dumping heap, waiting for toast too long.");
-            return null;
-        }
-
-        try {
-            // dump hprof 文件，取消 toast 展示
-            Debug.dumpHprofData(hprofFile.getAbsolutePath());
-            cancelToast(waitingForToast.get());
-            return hprofFile;
-        } catch (Exception e) {
-            MatrixLog.printErrStackTrace(TAG, e, "failed to dump heap into file: %s.", hprofFile.getAbsolutePath());
-            return null;
+        if (isShowToast) {
+            final FutureResult<Toast> waitingForToast = new FutureResult<>();
+            //// 显示一个正在 dump hprof 文件的 toast
+            showToast(waitingForToast);
+            // toast 没显示出来，主线程太忙了，放弃
+            if (!waitingForToast.wait(5, TimeUnit.SECONDS)) {
+                MatrixLog.w(TAG, "give up dumping heap, waiting for toast too long.");
+                return null;
+            }
+            try {
+                // dump hprof 文件，取消 toast 展示
+                Debug.dumpHprofData(hprofFile.getAbsolutePath());
+                cancelToast(waitingForToast.get());
+                return hprofFile;
+            } catch (Exception e) {
+                MatrixLog.printErrStackTrace(TAG, e, "failed to dump heap into file: %s.", hprofFile.getAbsolutePath());
+                return null;
+            }
+        } else {
+            try {
+                Debug.dumpHprofData(hprofFile.getAbsolutePath());
+                return hprofFile;
+            } catch (Exception e) {
+                MatrixLog.printErrStackTrace(TAG, e, "failed to dump heap into file: %s.", hprofFile.getAbsolutePath());
+                return null;
+            }
         }
     }
 

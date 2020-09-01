@@ -39,7 +39,7 @@ public class ActivityThreadHacker {
     public static AppMethodBeat.IndexRecord sLastLaunchActivityMethodIndex = new AppMethodBeat.IndexRecord();
     public static AppMethodBeat.IndexRecord sApplicationCreateBeginMethodIndex = new AppMethodBeat.IndexRecord();
     // application_create_scene：启动场景 Activity（159,100），Service（114），broadcastReceiver（）113
-    public static int sApplicationCreateScene = -100;
+    public static int sApplicationCreateScene = Integer.MIN_VALUE;
 
     public static void hackSysHandlerCallback() {
         try {

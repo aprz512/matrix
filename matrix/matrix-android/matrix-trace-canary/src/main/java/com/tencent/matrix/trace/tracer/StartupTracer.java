@@ -3,6 +3,7 @@ package com.tencent.matrix.trace.tracer;
 import android.app.Activity;
 import android.app.Application;
 import android.os.Bundle;
+import android.util.Log;
 
 import com.tencent.matrix.Matrix;
 import com.tencent.matrix.report.Issue;
@@ -88,7 +89,10 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
 
     @Override
     public void onActivityFocused(String activity) {
-        // 冷启动
+        if (ActivityThreadHacker.sApplicationCreateScene == Integer.MIN_VALUE) {
+            Log.w(TAG, "start up from unknown scene");
+            return;
+        }
         if (isColdStartup()) {
             if (firstScreenCost == 0) {
                 // 从 application 创建到第一个activity 回调 onActivityFocused 的时间
@@ -109,13 +113,10 @@ public class StartupTracer extends Tracer implements IAppMethodBeatListener, App
                 }
             }
             if (coldCost > 0) {
-                // 分析
                 analyse(ActivityThreadHacker.getApplicationCost(), firstScreenCost, coldCost, false);
             }
 
-        }
-        // 温启动
-        else if (isWarmStartUp()) {
+        } else if (isWarmStartUp()) {
             isWarmStartUp = false;
             // 计算的是第一个 activity 从启动到 onActivityFocused 的时间
             // ActivityThreadHacker hook 了 H 的 LAUNCH_ACTIVITY

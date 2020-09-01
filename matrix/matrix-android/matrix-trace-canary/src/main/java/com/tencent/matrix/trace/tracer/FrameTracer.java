@@ -50,7 +50,6 @@ public class FrameTracer extends Tracer {
 
         MatrixLog.i(TAG, "[init] frameIntervalMs:%s isFPSEnable:%s", frameIntervalMs, isFPSEnable);
         if (isFPSEnable) {
-            // 添加监听
             addListener(new FPSCollector());
         }
     }
@@ -96,13 +95,8 @@ public class FrameTracer extends Tracer {
                     if (config.isDevEnv()) {
                         listener.time = SystemClock.uptimeMillis();
                     }
-                    // 掉了几帧
                     final int dropFrame = (int) (taskCostMs / frameIntervalMs);
 
-                    // taskCostMs 与 frameCostMs 差不多，多执行几行代码的时间差别
-                    // 不过 frameCostMs 有可能为 0，当处理的message 是普通消息，而不是 doFrame 消息的时候
-                    // visibleScene 是当前 activity 的名字
-                    // isContainsFrame 我没搞懂，这个不是肯定为 true 吗？
                     listener.doFrameSync(visibleScene, taskCostMs, frameCostMs, dropFrame, isContainsFrame);
                     if (null != listener.getExecutor()) {
                         listener.getExecutor().execute(new Runnable() {
@@ -132,7 +126,6 @@ public class FrameTracer extends Tracer {
 
         private Handler frameHandler = new Handler(MatrixHandlerThread.getDefaultHandlerThread().getLooper());
 
-        // 转到 MatrixHandlerThread 里面去执行
         Executor executor = new Executor() {
             @Override
             public void execute(Runnable command) {

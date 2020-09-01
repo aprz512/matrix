@@ -31,7 +31,7 @@ jar {
         exclude 'META-INF/*.SF'
         exclude 'META-INF/*.DSA'
         exclude 'META-INF/*.RSA'
-        configurations.implementation.resolve().collect {
+        configurations.implementation.resolve().collect { 
             it.isDirectory() ? it : zipTree(it)
         }
     }
@@ -57,9 +57,9 @@ task buildApkCheckJar(type: Copy, dependsOn: [build, jar]) {
     into(project.file("tools_output"))
 }
 
-if ("External" == rootProject.ext.PUBLISH_CHANNEL) {
+if("External" == rootProject.ext.PUBLISH_CHANNEL) {
     apply from: rootProject.file('gradle/java-publish.gradle')
-} else {
+}else {
     //uploading to WeChat maven repo
     apply from: rootProject.file('gradle/WeChatPublish.gradle')
     wechatPublish {

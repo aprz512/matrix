@@ -87,10 +87,11 @@ public class UIThreadMonitor implements BeatLifecycle, Runnable {
         callbackQueueLock = reflectObject(choreographer, "mLock");
         MatrixLog.d(TAG, "init...." + callbackQueueLock);
         callbackQueues = reflectObject(choreographer, "mCallbackQueues");
-
-        addInputQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_INPUT], ADD_CALLBACK, long.class, Object.class, Object.class);
-        addAnimationQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_ANIMATION], ADD_CALLBACK, long.class, Object.class, Object.class);
-        addTraversalQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_TRAVERSAL], ADD_CALLBACK, long.class, Object.class, Object.class);
+        if (null != callbackQueues) {
+            addInputQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_INPUT], ADD_CALLBACK, long.class, Object.class, Object.class);
+            addAnimationQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_ANIMATION], ADD_CALLBACK, long.class, Object.class, Object.class);
+            addTraversalQueue = reflectChoreographerMethod(callbackQueues[CALLBACK_TRAVERSAL], ADD_CALLBACK, long.class, Object.class, Object.class);
+        }
         frameIntervalNanos = reflectObject(choreographer, "mFrameIntervalNanos");
 
         LooperMonitor.register(new LooperMonitor.LooperDispatchListener() {
@@ -296,7 +297,8 @@ public class UIThreadMonitor implements BeatLifecycle, Runnable {
     @Override
     public synchronized void onStart() {
         if (!isInit) {
-            throw new RuntimeException("never init!");
+            MatrixLog.e(TAG, "[onStart] is never init.");
+            return;
         }
         if (!isAlive) {
             this.isAlive = true;
@@ -347,7 +349,8 @@ public class UIThreadMonitor implements BeatLifecycle, Runnable {
     @Override
     public synchronized void onStop() {
         if (!isInit) {
-            throw new RuntimeException("UIThreadMonitor is never init!");
+            MatrixLog.e(TAG, "[onStart] is never init.");
+            return;
         }
         if (isAlive) {
             this.isAlive = false;

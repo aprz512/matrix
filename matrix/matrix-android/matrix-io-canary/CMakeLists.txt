@@ -10,6 +10,7 @@ project(IOCanary)
 # add_subdirectory 指明本项目包含一个子目录 ，这样子目录下的 CMakeLists.txt 文件和源代码也会被处理
 add_subdirectory(../matrix-android-commons/src/main/cpp/libxhook ${CMAKE_CURRENT_BINARY_DIR}/libxhook)
 
+
 # aux_source_directory 该命令会查找指定目录下的所有源文件，然后将结果存进指定变量名。
 # 它不会递归包含子目录，仅包含指定的目录
 aux_source_directory(src/main/cpp/detector/ SRC_DIR_DETECTOR)
@@ -44,6 +45,7 @@ add_library(
 # 找到 log-lib 库并链接到该动态库中
 find_library(log-lib
         log)
+
 
 # 在linux中c/c++的编译一般都是用gcc来编译的，c/c++编译时会产生.o文件，要通过make工具来把这些.o文件链接起来，
 # 这样才能得一个可执行程序。所以.so在编译时要把所有库链接起来才能编译。
