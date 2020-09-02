@@ -235,6 +235,7 @@ public class SQLiteLint {
             private int mBehaviourMask;
 
             public Builder() {
+                // 默认情况下，alert 是开着的
                 /* enable the alert behaviour as default*/
                 mBehaviourMask |= BEHAVIOUR_ALERT;
             }

@@ -21,6 +21,7 @@ import android.database.Cursor;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -60,6 +61,9 @@ public class TestSQLiteLintActivity extends AppCompatActivity {
             MatrixLog.i(TAG, "plugin-sqlite-lint start");
             plugin.start();
         }
+
+        SQLiteLint.SqlExecutionCallbackMode sqlExecutionCallbackMode = SQLiteLint.getSqlExecutionCallbackMode();
+        Log.e("mode", sqlExecutionCallbackMode + "");
 
         IssueFilter.setCurrentFilter(IssueFilter.ISSUE_SQLITELINT);
     }
@@ -215,8 +219,12 @@ public class TestSQLiteLintActivity extends AppCompatActivity {
             plugin.start();
         }
 
-        plugin.addConcernedDB(new SQLiteLintConfig.ConcernDb(TestDBHelper.get().getWritableDatabase())
+        SQLiteLintConfig.ConcernDb concernDb = new SQLiteLintConfig.ConcernDb(TestDBHelper.get().getWritableDatabase())
                 //.setWhiteListXml(R.xml.sqlite_lint_whitelist)//disable white list by default
-                .enableAllCheckers());
+                .enableAllCheckers();
+        Log.e("options", concernDb.getOptions().isAlertBehaviourEnable()+"");
+        Log.e("options", concernDb.getOptions().isReportBehaviourEnable()+"");
+
+        plugin.addConcernedDB(concernDb);
     }
 }

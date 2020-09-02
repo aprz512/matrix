@@ -47,6 +47,7 @@ namespace sqlitelint {
 
     void LintManager::Install(const char* db_path, OnPublishIssueCallback issued_callback) {
         sInfo("LintManager::Install dbPath:%s", db_path);
+        // 迭代的时候加锁，判断是否已经 install 过了
         std::unique_lock<std::mutex> lock(lints_mutex_);
         std::map<const std::string, Lint*>::iterator it = lints_.find(db_path);
         if (it != lints_.end()) {
@@ -55,6 +56,7 @@ namespace sqlitelint {
             return;
         }
 
+        // 添加到 lints_ 中
         Lint* lint = new Lint(db_path, issued_callback);
         lints_.insert(std::pair<const std::string, Lint*>(db_path, lint));
         lock.unlock();

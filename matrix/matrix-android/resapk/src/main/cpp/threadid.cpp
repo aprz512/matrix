@@ -8,7 +8,7 @@
 #include <thread>
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_example_resapk_Jni_getIds(JNIEnv *env, jclass clazz) {
+Java_com_example_resapk_Jni_getIds(JNIEnv *env, jclass thiz) {
 
     jintArray arr = env->NewIntArray(2);
 
@@ -44,3 +44,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_6;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_resapk_StaticCall_nativeMethod(JNIEnv *env, jobject thiz) {
+
+
+}

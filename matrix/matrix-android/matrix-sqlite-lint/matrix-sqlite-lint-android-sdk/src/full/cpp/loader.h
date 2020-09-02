@@ -25,6 +25,12 @@
 // Created by liyongjie on 2017/2/16.
 //
 
+// 宏：提取重复代码，这里的重复代码是字面意义的重复代码
+// 直接替换使用处的代码即可理解
+// 最后面缺少括号，所以可以推断使用出肯定要跟着括号
+// 所以这里是   声明了函数（第一行） 以及写了 函数的头部（最后一行）
+// 中间是另外一个函数，它的代码会在 main 之前执行，作用调用 register_module_func 函数，其第二个参数是
+// 第一行声明的函数
 #define MODULE_INIT(name) \
 	static int ModuleInit_##name(JavaVM *vm, JNIEnv *env); \
 	static void __attribute__((constructor)) MODULE_INIT_##name() \

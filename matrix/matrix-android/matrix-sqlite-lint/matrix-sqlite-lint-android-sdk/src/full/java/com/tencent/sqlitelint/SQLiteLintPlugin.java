@@ -121,6 +121,7 @@ public class SQLiteLintPlugin extends Plugin {
         SQLiteLint.notifySqlExecution(concernedDbPath, sql, timeCost);
     }
 
+    // 从 demo 里面看，这里是一个入口，
     public void addConcernedDB(SQLiteLintConfig.ConcernDb concernDb) {
         if (!isPluginStarted()) {
             SLog.i(TAG, "addConcernedDB isPluginStarted not");
@@ -134,7 +135,9 @@ public class SQLiteLintPlugin extends Plugin {
 
         mConfig.addConcernDB(concernDb);
 
+        // concernDd 里面是我们想要监测的数据库的一个类，里面存放了数据库的路径和 SQLiteDatabase 对象
         String concernedDbPath = concernDb.getInstallEnv().getConcernedDbPath();
+        // install 方法里面就是将concernDb 放入了一个map中
         SQLiteLint.install(mContext, concernDb.getInstallEnv(), concernDb.getOptions());
         SQLiteLint.setWhiteList(concernedDbPath, concernDb.getWhiteListXmlResId());
         SQLiteLint.enableCheckers(concernedDbPath, concernDb.getEnableCheckerList());

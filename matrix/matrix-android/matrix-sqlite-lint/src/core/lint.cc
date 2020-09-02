@@ -39,6 +39,7 @@ namespace sqlitelint {
             : env_(db_path), checked_sql_cache_(500)
             , issued_callback_(issued_callback), exit_(false){
 
+        // 这里创建了一个线程，线程开始运行 check 函数
         check_thread_ = new std::thread(&Lint::Check, this);
     }
 
@@ -82,6 +83,8 @@ namespace sqlitelint {
             }
         }
 
+        // 因为 unique_ptr 将拷贝构造函数删除了，所以不能直接赋值
+        // 使用 move 来创建右值引用（转成一个临时对象）
         sql_info = std::move(queue_.front());
         queue_.pop_front();
 
@@ -103,21 +106,26 @@ namespace sqlitelint {
     }
 
     void Lint::Check() {
+        // 这里由开了一个线程，运行 InitCheck 函数
         init_check_thread_ = new std::thread(&Lint::InitCheck, this);
 
         std::vector<Issue>* published_issues = new std::vector<Issue>;
         std::unique_ptr<SqlInfo> sql_info;
         SqlInfo simple_sql_info;
         while (true) {
+            // 从队列中取一个
             int ret = TakeSqlInfo(sql_info);
             if (ret != 0) {
                 sError("check exit");
                 break;
             }
 
+            // 记录sql数量，用于抽样
             env_.IncSqlCnt();
+            // 将 sql 语句进行预处理，去除前后空格，全转小写
             PreProcessSqlString(sql_info->sql_);
             sDebug("Lint::Check checked cnt=%d", env_.GetSqlCnt());
+            // sql 语句检测，只支持 "select" || "insert" || "update" || "delete" || "replac"
             if (!IsSqlSupportCheck(sql_info->sql_)) {
                 sDebug("Lint::Check Sql not support");
                 env_.AddToSqlHistory(*sql_info);
@@ -125,6 +133,7 @@ namespace sqlitelint {
                 continue;
             }
 
+            // 真正的预处理逻辑
             if (!PreProcessSqlInfo(sql_info.get())) {
                 sWarn("Lint::Check PreProcessSqlInfo failed");
                 env_.AddToSqlHistory(*sql_info);
@@ -137,11 +146,13 @@ namespace sqlitelint {
 
             published_issues->clear();
 
+            //这里是抽样检测
             ScheduleCheckers(CheckScene::kSample, *sql_info, published_issues);
 
             const std::string& wildcard_sql = sql_info->wildcard_sql_.empty() ? sql_info->sql_ : sql_info->wildcard_sql_;
             bool checked = false;
             if (!checked_sql_cache_.Get(wildcard_sql, checked)) {
+                // 这里是避免重复检测，与上面的抽象可能会重复
                 ScheduleCheckers(CheckScene::kUncheckedSql, *sql_info, published_issues);
                 checked_sql_cache_.Put(wildcard_sql, true);
             } else {
@@ -182,6 +193,8 @@ namespace sqlitelint {
     }
 
     void Lint::ScheduleCheckers(const CheckScene check_scene, const SqlInfo& sql_info, std::vector<Issue> *published_issues) {
+        // 检测场景不符，就直接返回
+        // 每个 Checker 有自己的检测场景
         std::map<CheckScene, std::vector<Checker*>>::iterator it = checkers_.find(check_scene);
         if (it == checkers_.end()) {
             return;
@@ -193,6 +206,7 @@ namespace sqlitelint {
         for (size_t i=0;i < scene_checkers_cnt;i++) {
 
             Checker* checker = scene_checkers[i];
+            // 如果是抽样检测（kSample），则需要满足隔 30 个取一个
             if (check_scene != CheckScene::kSample
                 || (env_.GetSqlCnt() % checker->GetSqlCntToSample() == 0)) {
                 checker->Check(env_, sql_info, published_issues);

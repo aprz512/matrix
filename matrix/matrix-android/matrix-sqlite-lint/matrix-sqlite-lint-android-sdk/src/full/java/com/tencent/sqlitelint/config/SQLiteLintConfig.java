@@ -57,6 +57,7 @@ public final class SQLiteLintConfig {
         }
 
         for (int i = 0; i < sConcernDbList.size(); i++) {
+            // 什么情况，这个条件肯定一直为 true 啊
             if (concernDbPath.equals(concernDB.mInstallEnv.getConcernedDbPath())) {
                 return;
             }

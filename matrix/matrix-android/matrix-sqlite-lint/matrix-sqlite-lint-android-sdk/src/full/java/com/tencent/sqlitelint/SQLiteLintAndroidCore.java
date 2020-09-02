@@ -59,6 +59,13 @@ import java.util.List;
         mConcernedDbPath = installEnv.getConcernedDbPath();
         mSQLiteExecutionDelegate = installEnv.getSQLiteExecutionDelegate();
 
+        // demo 里面使用的模式是 CUSTOM_NOTIFY，所以，这里就暂时不分析 hook 的流程
+        // 有时间再返回来分析
+
+        // HOOK模式下，SQLiteLint会自己去获取所有已执行的sql语句及其耗时(by hooking sqlite3_profile)
+
+        // CUSTOM_NOTIFY模式下，则需要调用 {@link SQLiteLint#notifySqlExecution(String, String, int)}
+        // 来通知SQLiteLint 需要分析的、已执行的sql语句及其耗时
         if (SQLiteLint.getSqlExecutionCallbackMode() == SQLiteLint.SqlExecutionCallbackMode.HOOK) {
             SQLite3ProfileHooker.hook();
         }
@@ -66,11 +73,14 @@ import java.util.List;
         SQLiteLintNativeBridge.nativeInstall(mConcernedDbPath);
 
         mBehaviors = new ArrayList<>();
+        // 将 issue 进行储存，保存起来
         /*PersistenceBehaviour is a default pre-behaviour */
         mBehaviors.add(new PersistenceBehaviour());
+        // 出现 issue 跳转新页面，展示 issue
         if (options.isAlertBehaviourEnable()) {
             mBehaviors.add(new IssueAlertBehaviour(context, mConcernedDbPath));
         }
+        // 出现 issue 进行上报
         if (options.isReportBehaviourEnable()) {
             mBehaviors.add(new IssueReportBehaviour(SQLiteLint.sReportDelegate));
         }

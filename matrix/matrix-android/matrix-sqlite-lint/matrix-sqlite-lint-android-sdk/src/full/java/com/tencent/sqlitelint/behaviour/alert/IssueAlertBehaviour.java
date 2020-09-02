@@ -61,6 +61,9 @@ public class IssueAlertBehaviour extends BaseBehaviour {
         createShortCut(context);
     }
 
+    /**
+     * issue publish 的时候，跳到一个新的页面，展示 issues
+     */
     @Override
     public void onPublish(List<SQLiteLintIssue> publishedIssues) {
         if (publishedIssues == null || publishedIssues.isEmpty()) {
@@ -89,6 +92,9 @@ public class IssueAlertBehaviour extends BaseBehaviour {
 
     private static final String NAME = "SQLiteLint";
 
+    /**
+     * 创建快捷方式
+     */
     private static void createShortCut(Context context) {
         final ContentResolver cr = context.getContentResolver();
         final Uri contentUri = Uri.parse("content://com.android.launcher2.settings/favorites?notify=true");

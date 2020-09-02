@@ -39,6 +39,7 @@ namespace sqlitelint {
 
     int SqliteLintExecSql(const char *file_name, const char *sql, SqlExecutionCallback callback,
                           void *para, char **err_msg) {
+        // 这里提示建议使用 auto
         int64_t exec_sql_callback_ptr = (int64_t) (intptr_t) callback;
         int64_t para_ptr = (int64_t) (intptr_t) para;
 
@@ -228,6 +229,11 @@ namespace sqlitelint {
         if (attached) kJvm->DetachCurrentThread();
     }
 
+    // java静态方法调用，这里应该是 jclass 才对吧
+    // jobject与jclass通常作为JNI函数的第二个参数，当所声明Native方法是静态方法时，对应参数jclass，
+    // 因为静态方法不依赖对象实例，而依赖于类，所以参数中传递的是一个jclass类型。
+    // 相反，如果声明的Native方法时非静态方法时，那么对应参数是jobject 。
+    // 不过 jobject 是 jclass 父类
     void Java_com_tencent_sqlitelint_SQLiteLintNativeBridge_nativeInstall(JNIEnv *env, jobject, jstring name) {
         char *filename = jstringToChars(env,name);
         InstallSQLiteLint(filename, OnIssuePublish);

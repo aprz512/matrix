@@ -83,6 +83,7 @@ public class IOCanaryCore implements OnJniIssuePublishListener, IssuePublisher.O
             IOCanaryJniBridge.install(ioConfig, this);
         }
 
+        // 开启了 CloseGuard，不是都能检测到么？？？
         // 监测 io 是否关闭了
         //if only detect io closeable leak use CloseGuardHooker is Better
         if (ioConfig.isDetectIOClosableLeak()) {

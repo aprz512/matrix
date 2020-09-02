@@ -6,5 +6,6 @@ public class Jni {
     }
 
     public static native int[] getIds();
+    public static native int[] getId3s();
 
 }
